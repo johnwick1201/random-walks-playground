@@ -1,12 +1,12 @@
 // main.js — UI wiring (slice 1: graph spec → live render)
 
-import { buildGraph, layout, positions, adjacency, mkRng } from './graph.js?v=28';
-import { drawGraph } from './render.js?v=28';
-import { parseGraphML } from './graphml.js?v=28';
-import { simulate } from './sim.js?v=28';
-import { drawWalkerPlot } from './plot.js?v=28';
-import { Player } from './animate.js?v=28';
-import { exportPlotPNG, exportCsv, exportManimZip, exportGraphML } from './export.js?v=28';
+import { buildGraph, layout, positions, adjacency, mkRng } from './graph.js?v=29';
+import { drawGraph } from './render.js?v=29';
+import { parseGraphML } from './graphml.js?v=29';
+import { simulate } from './sim.js?v=29';
+import { drawWalkerPlot, PLOT_PADDING } from './plot.js?v=29';
+import { Player } from './animate.js?v=29';
+import { exportPlotPNG, exportCsv, exportManimZip, exportGraphML } from './export.js?v=29';
 
 console.log('[playground] main.js v3 loaded');
 
@@ -695,6 +695,8 @@ function startPlayback() {
   playerBar.hidden = false;
   hud.hidden = false;
   lastDrawnPlotT = -1;
+  // Tell the user the plot is scrubbable now that a simulation exists.
+  plotArea.style.cursor = 'ew-resize';
   player = new Player({
     graph: state.graph,
     simResult: state.simResult,
@@ -735,37 +737,54 @@ playerReplay.addEventListener('click', () => player?.replay());
 playerEnd.addEventListener('click', () => player?.jumpToEnd());
 playerSpeed.addEventListener('change', () => player?.setSpeed(parseFloat(playerSpeed.value)));
 
-// ── click-and-drag scrubbing on the progress bar ──
-// On mousedown we pause and seek; while dragging we keep seeking. On mouseup
-// we resume only if playback was running before the drag started — that way
-// scrubbing a paused video keeps it paused at the new position.
+// ── click-and-drag scrubbing ──
+// Two surfaces are scrubbable: the player progress bar, and the walker-count
+// plot itself (so the blue vertical marker behaves like a video-editor
+// timeline). They share one set of mousemove/mouseup listeners, with the
+// per-surface "where am I in time?" logic plugged in via `scrubComputeT`.
 let scrubbing = false;
 let scrubResumeAfter = false;
 let lastScrubMs = 0;
+let scrubComputeT = null;
 
-function tFromPointerX(clientX) {
-  if (!player) return 0;
+function attachScrubbing(element, computeT) {
+  element.addEventListener('mousedown', (ev) => {
+    if (!player) return;
+    ev.preventDefault();
+    scrubbing = true;
+    scrubResumeAfter = player.playing;
+    scrubComputeT = computeT;
+    player.seekTo(computeT(ev.clientX));
+    lastScrubMs = performance.now();
+  });
+}
+
+// Progress-bar geometry: the whole bar maps linearly to [0, T].
+attachScrubbing(playerProgress, (clientX) => {
   const rect = playerProgress.getBoundingClientRect();
   const frac = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
   return Math.round(frac * player.T);
-}
+});
 
-playerProgress.addEventListener('mousedown', (ev) => {
-  if (!player) return;
-  ev.preventDefault();
-  scrubbing = true;
-  scrubResumeAfter = player.playing;
-  player.seekTo(tFromPointerX(ev.clientX));
-  lastScrubMs = performance.now();
+// Plot geometry: only the inner area between the y-axis labels (padL) and
+// the right margin (padR) maps to [0, T]. Clicks on the axis labels clamp
+// to the nearest end.
+attachScrubbing(plotArea, (clientX) => {
+  const rect = plotArea.getBoundingClientRect();
+  const innerW = rect.width - PLOT_PADDING.L - PLOT_PADDING.R;
+  if (innerW <= 0) return 0;
+  const x = clientX - rect.left - PLOT_PADDING.L;
+  const frac = Math.max(0, Math.min(1, x / innerW));
+  return Math.round(frac * player.T);
 });
 
 window.addEventListener('mousemove', (ev) => {
-  if (!scrubbing || !player) return;
+  if (!scrubbing || !player || !scrubComputeT) return;
   // Throttle to ~60Hz so very large T values don't backlog seeks.
   const now = performance.now();
   if (now - lastScrubMs < 16) return;
   lastScrubMs = now;
-  player.seekTo(tFromPointerX(ev.clientX));
+  player.seekTo(scrubComputeT(ev.clientX));
 });
 
 window.addEventListener('mouseup', () => {
@@ -815,6 +834,7 @@ function invalidatePlayback() {
   hud.hidden = true;
   state.simResult = null;
   lastDrawnPlotT = -1;
+  plotArea.style.cursor = '';
   refreshExportButtons();   // disable Plot/CSV now that simResult is gone
 }
 // Invalidate when any input that affects the SCENARIO changes (graph,

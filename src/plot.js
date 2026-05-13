@@ -1,6 +1,11 @@
 // plot.js — minimal Canvas line plot for walker count vs time.
 // Single dependency-free implementation. Adequate for one series + axes.
 
+// Padding around the inner plot area, in CSS pixels. Exported so the scrub
+// handler in main.js can convert a mouse-x in the plot container to a `t`
+// using the same coordinate system the renderer uses.
+export const PLOT_PADDING = { L: 50, R: 18, T: 12, B: 36 };
+
 const PLOT_COLORS = {
   bg: '#000000',
   axis: '#cccccc',
@@ -49,7 +54,8 @@ export function drawWalkerPlot(container, result, currentT = null) {
   if (!walkerCount || walkerCount.length === 0) return;
 
   // Plot area
-  const padL = 50, padR = 18, padT = 12, padB = 36;
+  const padL = PLOT_PADDING.L, padR = PLOT_PADDING.R,
+        padT = PLOT_PADDING.T, padB = PLOT_PADDING.B;
   const plotW = w - padL - padR;
   const plotH = h - padT - padB;
 
