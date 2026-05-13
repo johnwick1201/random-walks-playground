@@ -1,12 +1,12 @@
 // main.js — UI wiring (slice 1: graph spec → live render)
 
-import { buildGraph, layout, positions, adjacency, mkRng } from './graph.js?v=25';
-import { drawGraph } from './render.js?v=25';
-import { parseGraphML } from './graphml.js?v=25';
-import { simulate } from './sim.js?v=25';
-import { drawWalkerPlot } from './plot.js?v=25';
-import { Player } from './animate.js?v=25';
-import { exportPlotPNG, exportCsv, exportManimZip, exportGraphML } from './export.js?v=25';
+import { buildGraph, layout, positions, adjacency, mkRng } from './graph.js?v=26';
+import { drawGraph } from './render.js?v=26';
+import { parseGraphML } from './graphml.js?v=26';
+import { simulate } from './sim.js?v=26';
+import { drawWalkerPlot } from './plot.js?v=26';
+import { Player } from './animate.js?v=26';
+import { exportPlotPNG, exportCsv, exportManimZip, exportGraphML } from './export.js?v=26';
 
 console.log('[playground] main.js v3 loaded');
 
@@ -227,17 +227,27 @@ function validateNumber(raw, { min, max, name, exclusiveMin = false, exclusiveMa
 }
 
 // ── topology hint text ──
+// The ER hint computes the connectivity threshold ln(n)/n from the current N
+// rather than quoting a fixed value, so it stays accurate as the user changes N.
 const TOPOLOGY_HINTS = {
-  grid: 'Each node is connected to its up/down/left/right neighbors (where they exist).',
-  toroidal: 'Same as grid, but boundary nodes wrap to the opposite side (shown as dashed stubs).',
-  er: 'Each of the n(n−1)/2 possible edges is added independently with probability p. Once p > ln(n)/n (≈ 0.046 at n=100) the graph is almost-surely connected; below that you\'ll likely see isolated nodes.',
+  grid: () => 'Each node is connected to its up/down/left/right neighbors (where they exist).',
+  toroidal: () => 'Same as grid, but boundary nodes wrap to the opposite side (shown as dashed stubs).',
+  er: (n) => {
+    const thr = Math.log(n) / n;
+    return `Each of the n(n−1)/2 possible edges is added independently with probability p. Once p > ln(n)/n = ${thr.toFixed(5)} (at n=${n}) the graph is almost-surely connected; below that you'll likely see isolated nodes.`;
+  },
 };
 
 // ── show/hide rows based on topology ──
 function updateTopologyVisibility() {
   rowP.hidden = topology.value !== 'er';
   rowSeed.hidden = topology.value !== 'er';
-  topologyHint.textContent = TOPOLOGY_HINTS[topology.value] || '';
+  refreshTopologyHint();
+}
+
+function refreshTopologyHint() {
+  const make = TOPOLOGY_HINTS[topology.value];
+  topologyHint.textContent = make ? make(state.N) : '';
 }
 
 // ── render: compute the graph and draw it ──
@@ -300,6 +310,7 @@ N_input.addEventListener('input', () => {
     upload.value = '';
     render();
     syncPaneTitle();         // subtitle reflects N
+    refreshTopologyHint();   // ln(n)/n threshold depends on N
     recomputeAdversaries(); // adversary IDs may now be out of range; also re-runs start + warnings
   } else if (r.ok === 'empty') {
     clearError('Number of nodes (N)');
