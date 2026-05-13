@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <title>Random Walks on Graphs — Playground</title>
+  <link rel="stylesheet" href="styles.css?v=25">
+</head>
+<body>
+  <header class="topbar">
+    <h1>Random Walks on Graphs with Adversarial Nodes</h1>
+    <p class="subtitle">An interactive playground for the Duplicate-If-Late and Create-If-Late algorithms.</p>
+  </header>
+
+  <main class="layout">
+    <!-- LEFT: input panel -->
+    <section class="inputs" id="inputs">
+      <fieldset class="group" id="group-graph">
+        <legend>1. Graph</legend>
+
+        <div class="row">
+          <label for="upload">Upload GraphML</label>
+          <input type="file" id="upload" accept=".graphml,.xml">
+          <small class="hint">Optional. Max 100 nodes.</small>
+        </div>
+
+        <div class="row">
+          <label for="N">Or specify N (nodes)</label>
+          <input type="number" id="N" min="2" max="100" step="1" value="100">
+        </div>
+
+        <div class="row">
+          <label for="topology">Topology</label>
+          <select id="topology">
+            <option value="grid">Grid (no wrap)</option>
+            <option value="toroidal">Grid (toroidal / snake wrap)</option>
+            <option value="er">Random (Erdős–Rényi)</option>
+          </select>
+          <small class="hint" id="topology-hint"></small>
+        </div>
+
+        <div class="row" id="row-p" hidden>
+          <label for="p">p (edge probability)</label>
+          <div class="slider-pair">
+            <input type="range" id="p-slider" min="0" max="1" step="0.01" value="0.10">
+            <input type="number" id="p" min="0" max="1" step="0.01" value="0.10">
+          </div>
+        </div>
+
+        <div class="row" id="row-seed" hidden>
+          <label for="seed">Random seed</label>
+          <div class="seed-pair">
+            <input type="number" id="seed" step="1" value="11">
+            <button type="button" id="regen-graph">Regenerate</button>
+          </div>
+          <small class="hint">Change the seed, or click Regenerate to draw a new sample.</small>
+        </div>
+      </fieldset>
+
+      <!-- The rest of the input groups (adversaries, algorithm, start, T) will be added in subsequent slices. -->
+      <fieldset class="group" id="group-adversaries">
+        <legend>2. Adversarial nodes</legend>
+
+        <div class="row">
+          <label for="adv-mode">Selection mode</label>
+          <select id="adv-mode">
+            <option value="list">Specify by list</option>
+            <option value="random">Random selection</option>
+          </select>
+        </div>
+
+        <div class="row" id="row-adv-list">
+          <label for="adv-list">Adversary node IDs (comma-separated, 1–N)</label>
+          <input type="text" id="adv-list" placeholder="e.g. 4, 8, 72, 83, 100" autocomplete="off">
+        </div>
+
+        <div class="row" id="row-adv-count" hidden>
+          <label for="adv-count">Number of adversaries (M)</label>
+          <input type="number" id="adv-count" min="0" step="1" value="10">
+        </div>
+
+        <div class="row" id="row-adv-seed" hidden>
+          <label for="adv-seed">Random seed</label>
+          <div class="seed-pair">
+            <input type="number" id="adv-seed" step="1" value="11">
+            <button type="button" id="regen-adv">Regenerate</button>
+          </div>
+        </div>
+
+        <div class="echo echo-adv" id="adv-echo"></div>
+      </fieldset>
+      <fieldset class="group" id="group-algorithm">
+        <legend>3. Algorithm</legend>
+
+        <div class="row">
+          <label for="algorithm">Algorithm</label>
+          <select id="algorithm">
+            <option value="">— select —</option>
+            <option value="dil">Duplicate-If-Late</option>
+            <option value="cil">Create-If-Late</option>
+          </select>
+        </div>
+
+        <div class="row" id="row-threshold" hidden>
+          <label for="threshold" id="threshold-label">Threshold for Duplication</label>
+          <input type="number" id="threshold" min="1" step="1" value="3">
+        </div>
+
+        <div class="row" id="row-pcreate" hidden>
+          <label for="pcreate">P[Create | Threshold Reached]</label>
+          <input type="number" id="pcreate" min="0" max="1" step="0.01" value="0.10">
+        </div>
+      </fieldset>
+      <fieldset class="group" id="group-start">
+        <legend>4. Starting node</legend>
+
+        <div class="row">
+          <label for="start-mode">Selection mode</label>
+          <select id="start-mode">
+            <option value="">— select —</option>
+            <option value="manual">Specify by ID</option>
+            <option value="random">Random</option>
+            <option value="farthest">Farthest from adversarial nodes</option>
+          </select>
+        </div>
+
+        <div class="row" id="row-start-id" hidden>
+          <label for="start-id">Starting node ID (1–N)</label>
+          <input type="number" id="start-id" min="1" step="1" value="1">
+        </div>
+
+        <div class="row" id="row-start-seed" hidden>
+          <label for="start-seed">Random seed</label>
+          <div class="seed-pair">
+            <input type="number" id="start-seed" step="1" value="11">
+            <button type="button" id="regen-start">Regenerate</button>
+          </div>
+        </div>
+
+        <div class="echo echo-start" id="start-echo"></div>
+      </fieldset>
+      <fieldset class="group" id="group-time">
+        <legend>5. Time steps</legend>
+
+        <div class="row">
+          <label for="T">Number of time steps (T)</label>
+          <input type="number" id="T" min="1" max="10000" step="1" value="500">
+        </div>
+      </fieldset>
+
+      <button type="button" id="simulate" class="simulate" disabled>Simulate</button>
+      <small class="hint sim-hint" id="sim-hint"></small>
+
+      <fieldset class="group" id="group-exports">
+        <legend>6. Export</legend>
+
+        <div class="row">
+          <small class="hint">Graph file (importable here or in NetworkX / Gephi / yEd):</small>
+          <button type="button" id="export-graph" class="export-btn">Download graph (.graphml)</button>
+        </div>
+
+        <div class="row">
+          <small class="hint">Walker-count plot — image (fixed) or raw data (re-plot in your tool of choice):</small>
+          <div class="export-row">
+            <button type="button" id="export-plot" class="export-btn">Plot (.png)</button>
+            <button type="button" id="export-csv" class="export-btn">Data (.csv)</button>
+          </div>
+        </div>
+
+        <div class="row">
+          <small class="hint">Manim render package — produces the publication-quality video locally:</small>
+          <button type="button" id="export-zip" class="export-btn">Download Manim render package (.zip)</button>
+        </div>
+      </fieldset>
+    </section>
+
+    <!-- TOP-RIGHT: graphics pane -->
+    <section class="pane graphics" id="graphics">
+      <div class="pane-header">
+        <div class="pane-titles">
+          <h2 id="pane-title">Graph Preview</h2>
+          <h3 id="pane-subtitle"></h3>
+        </div>
+        <div class="preview-badge" title="This is a fast JavaScript reimplementation matching the Manim visual style. For publication-quality output, download the Manim render package.">
+          Live Preview · Not the Manim render
+          <span class="info-icon">ⓘ</span>
+        </div>
+      </div>
+      <canvas id="canvas" width="800" height="600"></canvas>
+      <div class="hud" id="hud" hidden>
+        <span class="hud-item">t = <span id="hud-t">0</span></span>
+        <span class="hud-sep">·</span>
+        <span class="hud-item">walkers: <span id="hud-walkers">1</span></span>
+      </div>
+      <div class="player-bar" id="player-bar" hidden>
+        <button type="button" id="player-play" title="Play/Pause">▶</button>
+        <button type="button" id="player-replay" title="Replay from start">↻</button>
+        <button type="button" id="player-end" title="Jump to end">⏭</button>
+        <label class="player-speed-label">
+          Speed
+          <select id="player-speed">
+            <option value="0.25">0.25×</option>
+            <option value="0.5">0.5×</option>
+            <option value="1" selected>1×</option>
+            <option value="2">2×</option>
+            <option value="4">4×</option>
+          </select>
+        </label>
+        <div class="player-progress" id="player-progress" title="Click or drag to scrub">
+          <div class="player-progress-track">
+            <div class="player-progress-fill" id="player-progress-fill"></div>
+          </div>
+        </div>
+        <span class="player-time" id="player-time">t = 0 / 0</span>
+      </div>
+      <div class="overlay" id="overlay" hidden>
+        <div class="overlay-content">
+          <strong id="overlay-title">Invalid input</strong>
+          <p id="overlay-msg"></p>
+        </div>
+      </div>
+      <div class="warnings" id="warnings"></div>
+    </section>
+
+    <!-- BOTTOM-RIGHT: plot pane -->
+    <section class="pane plot" id="plot">
+      <h2>Walker count vs. time</h2>
+      <div class="plot-area" id="plot-area">
+        <p class="placeholder-text">Run a simulation to see the walker-count trajectory.</p>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="src/main.js?v=25"></script>
+</body>
+</html>
