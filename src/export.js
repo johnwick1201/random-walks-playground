@@ -19,7 +19,7 @@ function substitute(template, vars) {
 
 async function fetchTemplate(name) {
   // Cache-bust to match the rest of the site's "force fresh" policy.
-  const r = await fetch(`templates/${name}?v=27`);
+  const r = await fetch(`templates/${name}?v=28`);
   if (!r.ok) throw new Error(`Failed to load template ${name}: HTTP ${r.status}`);
   return await r.text();
 }
@@ -67,7 +67,6 @@ function buildVars(state) {
   const advList = [...state.adversaries].sort((a, b) => a - b);
   const edges = state.graph.edges;
   const ev = buildEventStrings(state.simResult.events);
-  const extinctAt = state.simResult.extinctAt;
   return {
     DATE: new Date().toISOString().slice(0, 10),
     ALGORITHM:         state.algorithm,
@@ -87,7 +86,6 @@ function buildVars(state) {
     T:           state.T,
     SEED:        state.seed,
     PEAK_WALKERS:   state.simResult.peak,
-    END_T:          extinctAt == null ? state.T : extinctAt,
     EVENT_MOVES_LINES:   ev.moveLines,
     EVENT_KILLED_LINES:  ev.killedLines,
     EVENT_SPAWNED_LINES: ev.spawnedLines,

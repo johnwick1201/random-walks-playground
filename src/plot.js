@@ -59,10 +59,13 @@ export function drawWalkerPlot(container, result, currentT = null) {
   const xToPx = (x) => padL + (x / xMax) * plotW;
   const yToPx = (y) => padT + plotH - (y / yMax) * plotH;
 
-  // Gridlines
+  // Gridlines. Both axes are integer-valued (step t, walker count) so we
+  // force the step to a positive integer — niceStep can return fractional
+  // values (e.g. 0.5) when the range is small, which causes duplicate tick
+  // labels like 0,1,1,2,2,3,3 once we round each printed value.
   ctx.strokeStyle = PLOT_COLORS.grid;
   ctx.lineWidth = 1;
-  const yStep = niceStep(yMax, 6);
+  const yStep = Math.max(1, Math.round(niceStep(yMax, 6)));
   for (let v = 0; v <= yMax; v += yStep) {
     const y = yToPx(v);
     ctx.beginPath();
@@ -70,7 +73,7 @@ export function drawWalkerPlot(container, result, currentT = null) {
     ctx.lineTo(padL + plotW, y);
     ctx.stroke();
   }
-  const xStep = niceStep(xMax, 6);
+  const xStep = Math.max(1, Math.round(niceStep(xMax, 6)));
   for (let v = 0; v <= xMax; v += xStep) {
     const x = xToPx(v);
     ctx.beginPath();

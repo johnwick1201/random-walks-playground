@@ -38,7 +38,6 @@ A             = {{A}}
 P_CREATE      = {{P_CREATE}}
 TRANSITION_DT = 0.25
 PEAK_WALKERS  = {{PEAK_WALKERS}}
-END_T         = {{END_T}}
 
 # ── recorded events (one entry per time step) ──
 EVENT_MOVES = [

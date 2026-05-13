@@ -36,7 +36,6 @@ T             = {{T}}
 A             = {{A}}
 TRANSITION_DT = 0.25
 PEAK_WALKERS  = {{PEAK_WALKERS}}
-END_T         = {{END_T}}
 
 # ── recorded events (one entry per time step) ──
 # EVENT_MOVES[t]   = [(wid, to_node), ...]   walker `wid` moves to `to_node`
@@ -190,13 +189,15 @@ class RandomWalksScene(Scene):
         wcount_grp.next_to(time_grp, DOWN, aligned_edge=LEFT, buff=0.15)
         self.add(wcount_grp)
 
-        # ── plot (axes sized from the recorded peak / extinction time) ──
+        # ── plot (x-axis spans the full T so the user sees what they asked
+        # for, even if the population dies before then; y-axis is sized from
+        # the recorded peak) ──
         y_max  = max(5, int(np.ceil(PEAK_WALKERS * 1.1)))
         y_step = max(1, y_max // 5)
-        plot_x_step = max(10, END_T // 5)
+        plot_x_step = max(10, T // 5)
 
         axes = Axes(
-            x_range=[0, END_T, plot_x_step],
+            x_range=[0, T, plot_x_step],
             y_range=[0, y_max, y_step],
             width=5.0,
             height=4.5,
@@ -246,6 +247,7 @@ class RandomWalksScene(Scene):
 
         first_kill_done  = [False]
         first_spawn_done = [False]
+        extinct_shown    = [False]
 
         def show_rule_with_action(text, color, action_anims,
                                   action_run_time=1.0,
@@ -398,17 +400,19 @@ class RandomWalksScene(Scene):
             time_grp[1].set_value(t)
             wcount_grp[1].set_value(len(walkers))
 
-            # 6. SETTLE
-            self.wait(STEP_DT)
-
-            # Early termination once the population has gone extinct.
-            if not walkers:
+            # 6. Extinction reveal: show the message exactly once, the first
+            # step the population hits zero. The loop continues to T so the
+            # plot keeps extending along x and the HUD t keeps ticking —
+            # mirroring the browser preview which always runs to T.
+            if not walkers and not extinct_shown[0]:
+                extinct_shown[0] = True
                 ext_text = TexText("Population extinct", color=RED).scale(0.55)
                 ext_text.to_edge(DOWN, buff=0.6)
                 ext_box = SurroundingRectangle(
                     ext_text, color=RED, buff=0.20, stroke_width=2.5)
                 self.play(Write(ext_text), ShowCreation(ext_box), run_time=0.8)
-                self.wait(2.0)
-                break
+
+            # 7. SETTLE
+            self.wait(STEP_DT)
 
         self.wait(2.0)
