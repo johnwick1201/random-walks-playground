@@ -6,15 +6,17 @@ Graph topology:   {{TOPOLOGY_DESC}}
 Scenario:         N = {{N}}, # Pac-Mans = {{NUM_ADV}}, T = {{T}},
                   A = {{A}}, P_CREATE = {{P_CREATE}}
 
-This script is a faithful copy of graph_walks_create.py with the graph,
-adversaries, and starting node hardcoded to the scenario configured on the
-playground. Edit SEED (or any of the tunable parameters at the top) and
-re-render for a different sample.
+This script reproduces, frame-for-frame, the simulation run you saw in the
+browser when you clicked Download. Instead of re-running the random walk
+locally, it consumes the per-step event log (EVENT_MOVES / EVENT_KILLED /
+EVENT_SPAWNED) that was recorded at export time. The walker trajectory, kill
+times, spawn times, and walker-count curve will all match the browser preview
+exactly — only the rendering engine (Manim's vector pipeline) differs from
+the browser's Canvas2D draw, so anti-aliasing and TeX glyph rasterization
+may look subtly different.
 
-Toroidal-graph note: wrap-around edges (3rd tuple element 'h' or 'v') are
-drawn as short dashed stubs at the boundary, and a walker crossing such an
-edge animates in two phases — exit one side, enter the other — instead of
-slicing across the graph.
+To produce a different sample of the same scenario, re-export from the
+playground with a fresh Simulate click.
 
 Render:
     manimgl render_manimgl_cil.py CreateIfLateScene -w
@@ -24,51 +26,30 @@ Render:
 
 from manimlib import *
 import numpy as np
-import random
-from collections import defaultdict, deque
 
-
-# ── tunable parameters (edit then re-render) ──
-SEED          = {{SEED}}
-T             = {{T}}
-A             = {{A}}
-P_CREATE      = {{P_CREATE}}
-TRANSITION_DT = 0.25
 
 # ── scenario (hardcoded from the playground) ──
 N           = {{N}}
 EDGES       = [{{EDGES_PY}}]      # (u, v, wrap); wrap in {None, 'h', 'v'}
 ADVERSARIES = {{ADV_PY}}
 START_NODE  = {{START_NODE_PY}}
+T             = {{T}}
+A             = {{A}}
+P_CREATE      = {{P_CREATE}}
+TRANSITION_DT = 0.25
+PEAK_WALKERS  = {{PEAK_WALKERS}}
+END_T         = {{END_T}}
 
-
-# ── headless pre-simulation: predict peak walker count for axis sizing ──
-def predict_peak_walkers(seed):
-    rng = random.Random(seed)
-    adj = {i: [] for i in range(N)}
-    for e in EDGES:
-        u, v = e[0], e[1]
-        adj[u].append(v); adj[v].append(u)
-    advs = set(ADVERSARIES)
-    walkers = [{"node": START_NODE}]
-    node_counter = [0] * N
-    peak = 1
-    for _ in range(1, T + 1):
-        for w in walkers:
-            nbrs = adj[w["node"]]
-            w["node"] = rng.choice(nbrs) if nbrs else w["node"]
-        walkers = [w for w in walkers if w["node"] not in advs]
-        for i in range(N):
-            node_counter[i] += 1
-        for w in walkers:
-            node_counter[w["node"]] = 0
-        for i in range(N):
-            if i not in advs and node_counter[i] > A:
-                if rng.random() < P_CREATE:
-                    walkers.append({"node": i})
-                    node_counter[i] = 0
-        peak = max(peak, len(walkers))
-    return peak
+# ── recorded events (one entry per time step) ──
+EVENT_MOVES = [
+  {{EVENT_MOVES_LINES}}
+]
+EVENT_KILLED = [
+  {{EVENT_KILLED_LINES}}
+]
+EVENT_SPAWNED = [
+  {{EVENT_SPAWNED_LINES}}
+]
 
 
 # ── colors ──
@@ -88,12 +69,8 @@ class CreateIfLateScene(Scene):
         TRANS_DT = TRANSITION_DT
         STEP_DT  = 0.10
 
-        random.seed(SEED)
-        np.random.seed(SEED)
-
         self.camera.background_rgba = [0, 0, 0, 1]
 
-        # ── grid layout (floor(sqrt(N)) cols, matches playground) ──
         cols = max(1, int(N ** 0.5))
         full_rows = N // cols
         partial = N % cols
@@ -113,7 +90,6 @@ class CreateIfLateScene(Scene):
         edge_highlight_width = max(2.5, min(5.5, spacing * 7.0))
         stub_len             = spacing * 0.6
 
-        # Unit direction for the wrap-stub at `node`, pointing away from `partner`.
         def stub_dir(node, wrap, partner):
             if wrap == 'h':
                 return np.array([-1.0, 0, 0]) if (node % cols) < (partner % cols) \
@@ -121,12 +97,7 @@ class CreateIfLateScene(Scene):
             return np.array([0, 1.0, 0]) if (node // cols) < (partner // cols) \
                 else np.array([0, -1.0, 0])
 
-        # ── graph (hardcoded) ──
         edges = EDGES
-        adj = {i: [] for i in range(N)}
-        for u, v, _w in edges:
-            adj[u].append(v)
-            adj[v].append(u)
         wrap_lookup = {}
         for u, v, w in edges:
             if w is not None:
@@ -158,7 +129,7 @@ class CreateIfLateScene(Scene):
         title_grp.to_edge(UP, buff=0.10)
         self.add(title_grp)
 
-        # ── opening sequence (same staged reveal as duplicate-if-late) ──
+        # ── opening sequence ──
         node_dots = {}
         for i in range(N):
             d = Dot(positions[i], radius=node_radius)
@@ -168,7 +139,6 @@ class CreateIfLateScene(Scene):
         self.play(FadeIn(VGroup(*node_dots.values())), run_time=1.0)
         self.wait(0.4)
 
-        # Edges — wrap edges become two dashed stubs at the boundary.
         edge_visuals = []
         for u, v, w in edges:
             if w is None:
@@ -216,9 +186,8 @@ class CreateIfLateScene(Scene):
         wcount_grp.next_to(time_grp, DOWN, aligned_edge=LEFT, buff=0.15)
         self.add(wcount_grp)
 
-        # ── plot ──
-        peak_walkers = predict_peak_walkers(SEED)
-        y_max  = max(5, int(np.ceil(peak_walkers * 1.1)))
+        # ── plot (axes sized from the recorded peak) ──
+        y_max  = max(5, int(np.ceil(PEAK_WALKERS * 1.1)))
         y_step = max(1, y_max // 5)
         plot_x_step = max(10, T // 5)
 
@@ -254,42 +223,20 @@ class CreateIfLateScene(Scene):
                 pts = pts + pts
             plot_line.set_points_as_corners(pts)
 
-        # ── walker state ──
-        walkers = {}
-        next_wid = [0]
-        next_color_idx = [0]
+        # ── walker state (same shape as the DIL variant) ──
+        walkers = {0: {"node": START_NODE,
+                       "color": WALKER_COLS[0 % len(WALKER_COLS)],
+                       "edge_highlight": None}}
 
-        def get_next_color():
-            c = WALKER_COLS[next_color_idx[0] % len(WALKER_COLS)]
-            next_color_idx[0] += 1
-            return c
-
-        def make_walker(node, color=None):
-            wid = next_wid[0]; next_wid[0] += 1
-            if color is None:
-                color = get_next_color()
-            return {
-                "wid": wid, "node": node, "prev_node": None,
-                "color": color,
-                # list of (line_mobject, anchor_point); 1 entry for normal,
-                # 2 entries for wrap edges.
-                "edge_highlight": None,
-            }
-
-        start_node = START_NODE
-        first_walker = make_walker(start_node)
-        walkers[first_walker["wid"]] = first_walker
         self.play(
-            Flash(positions[start_node], color=first_walker["color"],
+            Flash(positions[START_NODE], color=walkers[0]["color"],
                   line_length=0.32, num_lines=14, flash_radius=0.40),
             run_time=0.6,
         )
         self.wait(0.3)
 
-        node_counter = [0] * N
-
-        first_kill_done = [False]
-        first_create_done = [False]
+        first_kill_done  = [False]
+        first_spawn_done = [False]
 
         def show_rule_with_action(text, color, action_anims,
                                   action_run_time=1.0,
@@ -305,21 +252,18 @@ class CreateIfLateScene(Scene):
             self.wait(post_hold)
             self.play(FadeOut(rule_text), FadeOut(box), run_time=0.4)
 
-        # Build the per-walker move animation. Normal moves use a single
-        # ShowCreation Line; wrap moves use an AnimationGroup that plays
-        # source-stub then dest-stub sequentially within TRANS_DT.
-        def build_move_animation(w):
+        def build_move_animation(w, new_node):
             p_cur = positions[w["node"]]
-            p_new = positions[w["_new_node"]]
-            wrap = get_wrap(w["node"], w["_new_node"])
+            p_new = positions[new_node]
+            wrap = get_wrap(w["node"], new_node)
             if wrap is None:
                 new_edge = Line(p_cur, p_new,
                                 stroke_width=edge_highlight_width,
                                 stroke_opacity=0.85)
                 new_edge.set_color(w["color"])
                 return ShowCreation(new_edge), [(new_edge, p_new)]
-            u_far = p_cur + stub_dir(w["node"], wrap, w["_new_node"]) * stub_len
-            v_far = p_new + stub_dir(w["_new_node"], wrap, w["node"]) * stub_len
+            u_far = p_cur + stub_dir(w["node"], wrap, new_node) * stub_len
+            v_far = p_new + stub_dir(new_node, wrap, w["node"]) * stub_len
             u_stub = Line(p_cur, u_far, stroke_width=edge_highlight_width,
                           stroke_opacity=0.85)
             u_stub.set_color(w["color"])
@@ -342,24 +286,25 @@ class CreateIfLateScene(Scene):
                 anims.append(Transform(line, target))
             return anims
 
-        # ── simulation loop ──
+        # ── event-driven simulation loop ──
         for t in range(1, T + 1):
-            # 1. PLAN
-            for w in walkers.values():
-                nbrs = adj[w["node"]]
-                w["_new_node"] = random.choice(nbrs) if nbrs else w["node"]
+            moves_t   = EVENT_MOVES[t - 1]
+            killed_t  = EVENT_KILLED[t - 1]
+            spawned_t = EVENT_SPAWNED[t - 1]
 
-            # 2. ANIMATE TRANSITION
             transition_anims = []
             old_pieces_to_remove = []
             new_edges_pending = []
-            for w in walkers.values():
+            for wid, to_node in moves_t:
+                w = walkers.get(wid)
+                if w is None:
+                    continue
                 if w["edge_highlight"] is not None:
                     transition_anims.extend(fade_anims_for(w["edge_highlight"], w["color"]))
                     old_pieces_to_remove.extend(p[0] for p in w["edge_highlight"])
-                move_anim, new_pieces = build_move_animation(w)
+                move_anim, new_pieces = build_move_animation(w, to_node)
                 transition_anims.append(move_anim)
-                new_edges_pending.append((w, new_pieces))
+                new_edges_pending.append((wid, to_node, new_pieces))
 
             if transition_anims:
                 self.play(*transition_anims, run_time=TRANS_DT)
@@ -367,30 +312,23 @@ class CreateIfLateScene(Scene):
             for piece in old_pieces_to_remove:
                 self.remove(piece)
 
-            # 3. APPLY MOVES
-            for w in walkers.values():
-                w["prev_node"] = w["node"]
-                w["node"] = w["_new_node"]
-                del w["_new_node"]
-            for w, new_pieces in new_edges_pending:
-                w["edge_highlight"] = new_pieces
+            for wid, to_node, new_pieces in new_edges_pending:
+                w = walkers.get(wid)
+                if w is not None:
+                    w["node"] = to_node
+                    w["edge_highlight"] = new_pieces
 
-            # 4. KILLS
-            killed_wids = [wid for wid, w in walkers.items()
-                           if w["node"] in adversaries]
-            killed_nodes = [walkers[wid]["node"] for wid in killed_wids]
-
-            if killed_wids:
-                killed_edges_to_remove = []
+            if killed_t:
+                killed_pieces_to_remove = []
+                killed_nodes = [walkers[wid]["node"] for wid in killed_t if wid in walkers]
 
                 def build_kill_anims(line_length, num_lines, flash_radius):
                     anims = []
-                    for wid in killed_wids:
-                        w = walkers[wid]
-                        pieces = w.get("edge_highlight")
-                        if pieces:
-                            anims.extend(fade_anims_for(pieces, w["color"]))
-                            killed_edges_to_remove.extend(p[0] for p in pieces)
+                    for wid in killed_t:
+                        w = walkers.get(wid)
+                        if w and w.get("edge_highlight"):
+                            anims.extend(fade_anims_for(w["edge_highlight"], w["color"]))
+                            killed_pieces_to_remove.extend(p[0] for p in w["edge_highlight"])
                     flashes = [Flash(positions[n], color=KILL_COL,
                                      line_length=line_length,
                                      num_lines=num_lines,
@@ -411,36 +349,24 @@ class CreateIfLateScene(Scene):
                     self.play(*build_kill_anims(0.20, 10, 0.30),
                               run_time=0.4)
 
-                for piece in killed_edges_to_remove:
+                for piece in killed_pieces_to_remove:
                     self.remove(piece)
-                for wid in killed_wids:
+                for wid in killed_t:
                     walkers.pop(wid, None)
 
-            # 5. UPDATE NODE COUNTERS
-            for i in range(N):
-                node_counter[i] += 1
-            for w in walkers.values():
-                node_counter[w["node"]] = 0
-
-            # 6. CREATIONS
-            create_nodes = [
-                i for i in range(N)
-                if i not in adversaries and node_counter[i] > A
-                and random.random() < P_CREATE
-            ]
-
-            new_walkers_to_add = {}
-            if create_nodes:
-                if not first_create_done[0]:
-                    first_create_done[0] = True
-                    flash_anims = [Flash(positions[i], color=BIRTH_COL,
-                                         line_length=0.32, num_lines=14,
-                                         flash_radius=0.45)
-                                   for i in create_nodes]
-                    for i in create_nodes:
-                        new_w = make_walker(i)
-                        new_walkers_to_add[new_w["wid"]] = new_w
-                        node_counter[i] = 0
+            if spawned_t:
+                flash_args = (0.32, 14, 0.45) if not first_spawn_done[0] else (0.22, 10, 0.35)
+                flash_anims = [Flash(positions[node], color=BIRTH_COL,
+                                     line_length=flash_args[0],
+                                     num_lines=flash_args[1],
+                                     flash_radius=flash_args[2])
+                               for _wid, node in spawned_t]
+                for wid, node in spawned_t:
+                    walkers[wid] = {"node": node,
+                                    "color": WALKER_COLS[wid % len(WALKER_COLS)],
+                                    "edge_highlight": None}
+                if not first_spawn_done[0]:
+                    first_spawn_done[0] = True
                     show_rule_with_action(
                         "If a node has not been visited for a long time, "
                         "it spawns a new walker with probability $p$",
@@ -449,24 +375,13 @@ class CreateIfLateScene(Scene):
                         action_run_time=0.9,
                     )
                 else:
-                    flash_anims = [Flash(positions[i], color=BIRTH_COL,
-                                         line_length=0.22, num_lines=10,
-                                         flash_radius=0.35)
-                                   for i in create_nodes]
-                    for i in create_nodes:
-                        new_w = make_walker(i)
-                        new_walkers_to_add[new_w["wid"]] = new_w
-                        node_counter[i] = 0
                     self.play(*flash_anims, run_time=0.4)
-            walkers.update(new_walkers_to_add)
 
-            # 7. UPDATE PLOT + HUD
             plot_pts.append((t, len(walkers)))
             refresh_plot()
             time_grp[1].set_value(t)
             wcount_grp[1].set_value(len(walkers))
 
-            # 8. SETTLE
             self.wait(STEP_DT)
 
         self.wait(2.0)

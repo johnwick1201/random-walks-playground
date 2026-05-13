@@ -19,7 +19,7 @@ function substitute(template, vars) {
 
 async function fetchTemplate(name) {
   // Cache-bust to match the rest of the site's "force fresh" policy.
-  const r = await fetch(`templates/${name}?v=22`);
+  const r = await fetch(`templates/${name}?v=27`);
   if (!r.ok) throw new Error(`Failed to load template ${name}: HTTP ${r.status}`);
   return await r.text();
 }
@@ -44,11 +44,30 @@ function topologyDesc(state) {
   return `N=${state.N}`;
 }
 
+// Serialize the per-step events the simulator already records, in a stripped
+// form: drop `from` on moves (recoverable from walker state during playback)
+// and drop `source` on spawns (purely metadata). Returns Python literals plus
+// a total-character estimate so the export can warn on outsized payloads.
+function buildEventStrings(events) {
+  const moveLines = events.map(e =>
+    `[${e.moves.map(m => `(${m.wid},${m.to})`).join(',')}]`).join(',\n  ');
+  const killedLines = events.map(e =>
+    `[${e.killed.join(',')}]`).join(',\n  ');
+  const spawnedLines = events.map(e =>
+    `[${e.spawned.map(s => `(${s.wid},${s.from})`).join(',')}]`).join(',\n  ');
+  return {
+    moveLines, killedLines, spawnedLines,
+    size: moveLines.length + killedLines.length + spawnedLines.length,
+  };
+}
+
 // Substitution dictionary for the Manim render templates.
 function buildVars(state) {
   const isDil = state.algorithm === 'dil';
   const advList = [...state.adversaries].sort((a, b) => a - b);
   const edges = state.graph.edges;
+  const ev = buildEventStrings(state.simResult.events);
+  const extinctAt = state.simResult.extinctAt;
   return {
     DATE: new Date().toISOString().slice(0, 10),
     ALGORITHM:         state.algorithm,
@@ -67,6 +86,12 @@ function buildVars(state) {
     P_CREATE:    state.pcreate,
     T:           state.T,
     SEED:        state.seed,
+    PEAK_WALKERS:   state.simResult.peak,
+    END_T:          extinctAt == null ? state.T : extinctAt,
+    EVENT_MOVES_LINES:   ev.moveLines,
+    EVENT_KILLED_LINES:  ev.killedLines,
+    EVENT_SPAWNED_LINES: ev.spawnedLines,
+    _eventsSize:     ev.size,   // not substituted; read by the caller for the size guard
   };
 }
 
@@ -113,17 +138,37 @@ export function exportPlotPNG(state) {
 
 export async function exportManimZip(state) {
   // The Manim render scripts are direct adaptations of the user's existing
-  // graph_walks.py / graph_walks_create.py — one per algorithm. We ship only
-  // the one matching the chosen algorithm; switching means re-exporting from
-  // the playground.
+  // graph_walks.py / graph_walks_create.py — one per algorithm. They consume
+  // the simulation's recorded events (moves, kills, spawns) so the local
+  // render reproduces the exact run the user just saw in the browser.
+  if (!state.simResult) {
+    alert('Run Simulate first — the Manim package embeds the events from that run.');
+    return;
+  }
   const isDil = state.algorithm === 'dil';
   const scriptName = isDil ? 'render_manimgl_dil.py' : 'render_manimgl_cil.py';
+  const vars = buildVars(state);
+
+  // Guard rail: warn if the recorded events are unusually large. Typical
+  // grid + DIL scenarios are well under 100 KB; only dense Create-If-Late
+  // runs at high T push past a few MB. We don't block — we just inform.
+  const sizeMB = vars._eventsSize / 1024 / 1024;
+  if (sizeMB > 20) {
+    const proceed = confirm(
+      `Heads up: the events from this run encode to ${sizeMB.toFixed(1)} MB ` +
+      `inside the downloaded script — this scenario is at the high end. The ` +
+      `download will still work but the file will be large. Continue?`
+    );
+    if (!proceed) return;
+  } else if (sizeMB > 5) {
+    console.warn(`[export] Manim script will embed ~${sizeMB.toFixed(1)} MB of recorded events`);
+  }
+
   const [gl, readme, req] = await Promise.all([
     fetchTemplate(scriptName),
     fetchTemplate('README.md'),
     fetchTemplate('requirements.txt'),
   ]);
-  const vars = buildVars(state);
   const zip = createZip([
     { name: scriptName,            content: substitute(gl, vars) },
     { name: 'README.md',           content: substitute(readme, vars) },
