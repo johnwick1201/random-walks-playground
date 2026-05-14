@@ -1,12 +1,12 @@
 // main.js — UI wiring (slice 1: graph spec → live render)
 
-import { buildGraph, layout, positions, adjacency, mkRng } from './graph.js?v=29';
-import { drawGraph } from './render.js?v=29';
-import { parseGraphML } from './graphml.js?v=29';
-import { simulate } from './sim.js?v=29';
-import { drawWalkerPlot, PLOT_PADDING } from './plot.js?v=29';
-import { Player } from './animate.js?v=29';
-import { exportPlotPNG, exportCsv, exportManimZip, exportGraphML } from './export.js?v=29';
+import { buildGraph, layout, positions, adjacency, mkRng } from './graph.js?v=30';
+import { drawGraph } from './render.js?v=30';
+import { parseGraphML } from './graphml.js?v=30';
+import { simulate } from './sim.js?v=30';
+import { drawWalkerPlot, PLOT_PADDING } from './plot.js?v=30';
+import { Player } from './animate.js?v=30';
+import { exportPlotPNG, exportCsv, exportManimZip, exportGraphML } from './export.js?v=30';
 
 console.log('[playground] main.js v3 loaded');
 
@@ -19,18 +19,19 @@ const state = {
   seed: 11,
   graph: null,
   uploaded: false,
-  // adversaries
-  advMode: 'list',         // 'list' | 'random'
+  // adversaries — default to random selection so the user lands on a fully
+  // configured scenario they can just click Simulate on.
+  advMode: 'random',       // 'list' | 'random'
   advListRaw: '',          // raw text in the CSV input
   advCount: 10,            // M (used in random mode)
-  advSeed: 11,
+  advSeed: 123456789,
   adversaries: new Set(),  // 0-indexed Set<number>
   // algorithm
-  algorithm: '',           // '' | 'dil' | 'cil'
+  algorithm: 'dil',        // '' | 'dil' | 'cil'
   threshold: 3,            // strictly positive integer
   pcreate: 0.10,           // real in [0, 1]
   // start
-  startMode: '',           // '' | 'manual' | 'random' | 'farthest'
+  startMode: 'farthest',   // '' | 'manual' | 'random' | 'farthest'
   startIdRaw: 1,           // 1-indexed value from manual input
   startSeed: 11,
   startNode: null,         // 0-indexed (or null if not set)
@@ -324,18 +325,26 @@ N_input.addEventListener('input', () => {
 topology.addEventListener('change', () => {
   state.topology = topology.value;
   updateTopologyVisibility();
+  // Any error tied to a now-hidden ER-only input is stale; drop it so the
+  // overlay doesn't keep complaining about a field that isn't visible.
+  if (topology.value !== 'er') {
+    clearError('p (edge probability)');
+    clearError('Random seed');
+  }
   state.uploaded = false;
   upload.value = '';
   render();
   recomputeStart();  // graph shape changed → reachability and farthest may change
 });
 
-// p slider + input stay in sync. Slider already produces valid floats in [0,1];
-// the typed input goes through validateNumber for clear error messages.
-function applyP(v) {
+// p slider + text input stay in sync, but the reflective update has to know
+// which surface fired it: writing the normalized number back to the typed
+// input mid-keystroke strips the trailing decimal ("0." → "0"), so a user
+// typing "0.046" ends up with "46". `source` tells us which side to skip.
+function applyP(v, source) {
   state.p = v;
-  pSlider.value = String(v);
-  pInput.value = String(v);
+  if (source !== 'slider') pSlider.value = String(v);
+  if (source !== 'input')  pInput.value  = String(v);
   if (state.topology === 'er') {
     state.uploaded = false;
     upload.value = '';
@@ -345,13 +354,13 @@ function applyP(v) {
 }
 pSlider.addEventListener('input', () => {
   clearError('p (edge probability)');
-  applyP(parseFloat(pSlider.value));
+  applyP(parseFloat(pSlider.value), 'slider');
 });
 pInput.addEventListener('input', () => {
   const r = validateNumber(pInput.value, { min: 0, max: 1, name: 'p (edge probability)' });
   if (r.ok === true) {
     clearError('p (edge probability)');
-    applyP(r.value);
+    applyP(r.value, 'input');
   } else if (r.ok === 'empty') {
     clearError('p (edge probability)');
   } else {
@@ -439,6 +448,13 @@ function recomputeAdversaries() {
 advMode.addEventListener('change', () => {
   state.advMode = advMode.value;
   updateAdvVisibility();
+  // Drop errors tied to the mode we're leaving so the overlay doesn't keep
+  // showing a complaint for a hidden field.
+  if (advMode.value !== 'list')   clearError('Adversary list');
+  if (advMode.value !== 'random') {
+    clearError('Number of adversaries (M)');
+    clearError('Adversary seed');
+  }
   recomputeAdversaries();
 });
 
@@ -858,6 +874,9 @@ function invalidatePlayback() {
 startMode.addEventListener('change', () => {
   state.startMode = startMode.value;
   updateStartVisibility();
+  // Drop errors tied to inputs the new mode doesn't expose.
+  if (startMode.value !== 'manual') clearError('Starting node ID');
+  if (startMode.value !== 'random') clearError('Start seed');
   recomputeStart();
 });
 startId.addEventListener('input', () => recomputeStart());
@@ -917,6 +936,9 @@ function syncPaneTitle() {
 algorithmSel.addEventListener('change', () => {
   state.algorithm = algorithmSel.value;
   updateAlgoVisibility();
+  // Drop errors tied to inputs the new algorithm doesn't expose.
+  if (algorithmSel.value === '')    clearError('Threshold');
+  if (algorithmSel.value !== 'cil') clearError('P[Create | Threshold Reached]');
   syncPaneTitle();
 });
 
@@ -983,13 +1005,49 @@ window.addEventListener('resize', () => {
 });
 
 // ── init ──
+// Push every default from `state` into the corresponding DOM control so the
+// page is fully configured the moment it loads. The user can click Simulate
+// immediately — Quick Start without a button.
+N_input.value        = String(state.N);
+topology.value       = state.topology;
+seedInput.value      = String(state.seed);
+pSlider.value        = String(state.p);
+pInput.value         = String(state.p);
+advMode.value        = state.advMode;
+advCount.value       = String(state.advCount);
+advSeed.value        = String(state.advSeed);
+algorithmSel.value   = state.algorithm;
+thresholdInput.value = String(state.threshold);
+pcreateInput.value   = String(state.pcreate);
+startMode.value      = state.startMode;
+startId.value        = String(state.startIdRaw);
+startSeedInput.value = String(state.startSeed);
+TInput.value         = String(state.T);
+
 updateTopologyVisibility();
 updateAdvVisibility();
 updateAlgoVisibility();
 updateStartVisibility();
-seedInput.value = String(state.seed);
-pSlider.value = String(state.p);
-pInput.value = String(state.p);
 syncPaneTitle();
-render();
+render();                 // builds state.graph
+recomputeAdversaries();   // generates 10 random adversaries + re-runs start/warnings
 refreshSimulateButton();
+refreshExportButtons();
+
+// ── collapse-all / expand-all toggle ──
+const collapseAllBtn = el('collapse-all');
+function refreshCollapseLabel() {
+  const groups = document.querySelectorAll('.inputs details.group');
+  const allOpen = [...groups].every(d => d.open);
+  collapseAllBtn.textContent = allOpen ? 'Collapse all' : 'Expand all';
+}
+collapseAllBtn.addEventListener('click', () => {
+  const groups = document.querySelectorAll('.inputs details.group');
+  const allOpen = [...groups].every(d => d.open);
+  groups.forEach(d => { d.open = !allOpen; });
+  refreshCollapseLabel();
+});
+document.querySelectorAll('.inputs details.group').forEach(d => {
+  d.addEventListener('toggle', refreshCollapseLabel);
+});
+refreshCollapseLabel();

@@ -6,7 +6,7 @@
   <meta http-equiv="Cache-Control" content="no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <title>Random Walks on Graphs — Playground</title>
-  <link rel="stylesheet" href="styles.css?v=29">
+  <link rel="stylesheet" href="styles.css?v=30">
 </head>
 <body>
   <header class="topbar">
@@ -17,8 +17,13 @@
   <main class="layout">
     <!-- LEFT: input panel -->
     <section class="inputs" id="inputs">
-      <fieldset class="group" id="group-graph">
-        <legend>1. Graph</legend>
+      <div class="panel-banner">
+        <span><strong>Quick start:</strong> defaults are pre-filled — just click <em>Simulate</em>. Open any section below to tweak.</span>
+        <button type="button" id="collapse-all" class="collapse-toggle">Collapse all</button>
+      </div>
+
+      <details class="group" id="group-graph" open>
+        <summary>1. Graph</summary>
 
         <div class="row">
           <label for="upload">Upload GraphML</label>
@@ -57,11 +62,10 @@
           </div>
           <small class="hint">Change the seed, or click Regenerate to draw a new sample.</small>
         </div>
-      </fieldset>
+      </details>
 
-      <!-- The rest of the input groups (adversaries, algorithm, start, T) will be added in subsequent slices. -->
-      <fieldset class="group" id="group-adversaries">
-        <legend>2. Adversarial nodes</legend>
+      <details class="group" id="group-adversaries" open>
+        <summary>2. Adversarial nodes</summary>
 
         <div class="row">
           <label for="adv-mode">Selection mode</label>
@@ -90,9 +94,10 @@
         </div>
 
         <div class="echo echo-adv" id="adv-echo"></div>
-      </fieldset>
-      <fieldset class="group" id="group-algorithm">
-        <legend>3. Algorithm</legend>
+      </details>
+
+      <details class="group" id="group-algorithm" open>
+        <summary>3. Algorithm</summary>
 
         <div class="row">
           <label for="algorithm">Algorithm</label>
@@ -112,9 +117,10 @@
           <label for="pcreate">P[Create | Threshold Reached]</label>
           <input type="number" id="pcreate" min="0" max="1" step="0.01" value="0.10">
         </div>
-      </fieldset>
-      <fieldset class="group" id="group-start">
-        <legend>4. Starting node</legend>
+      </details>
+
+      <details class="group" id="group-start" open>
+        <summary>4. Starting node</summary>
 
         <div class="row">
           <label for="start-mode">Selection mode</label>
@@ -140,21 +146,22 @@
         </div>
 
         <div class="echo echo-start" id="start-echo"></div>
-      </fieldset>
-      <fieldset class="group" id="group-time">
-        <legend>5. Time steps</legend>
+      </details>
+
+      <details class="group" id="group-time" open>
+        <summary>5. Time steps</summary>
 
         <div class="row">
           <label for="T">Number of time steps (T)</label>
           <input type="number" id="T" min="1" max="10000" step="1" value="500">
         </div>
-      </fieldset>
+      </details>
 
       <button type="button" id="simulate" class="simulate" disabled>Simulate</button>
       <small class="hint sim-hint" id="sim-hint"></small>
 
-      <fieldset class="group" id="group-exports">
-        <legend>6. Export</legend>
+      <details class="group" id="group-exports" open>
+        <summary>6. Export</summary>
 
         <div class="row">
           <small class="hint">Graph file (importable here or in NetworkX / Gephi / yEd):</small>
@@ -173,7 +180,7 @@
           <small class="hint">Manim render package — produces the publication-quality video locally:</small>
           <button type="button" id="export-zip" class="export-btn">Download Manim render package (.zip)</button>
         </div>
-      </fieldset>
+      </details>
     </section>
 
     <!-- TOP-RIGHT: graphics pane -->
@@ -233,6 +240,6 @@
     </section>
   </main>
 
-  <script type="module" src="src/main.js?v=29"></script>
+  <script type="module" src="src/main.js?v=30"></script>
 </body>
 </html>
