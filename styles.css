@@ -122,8 +122,10 @@ details.group > summary::-webkit-details-marker { display: none; }
 details.group > summary::before {
   content: '▾';
   display: inline-block;
-  width: 14px;
-  font-size: 10px;
+  width: 28px;
+  font-size: 25px;
+  line-height: 1;
+  vertical-align: middle;
   color: var(--text-dim);
 }
 details.group:not([open]) > summary::before { content: '▸'; }
