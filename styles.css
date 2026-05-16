@@ -435,3 +435,108 @@ details.group:not([open]) > summary::before { content: '▸'; }
   font-size: 12px;
   margin-top: 4px;
 }
+
+/* ───────────────── Mobile / small-screen overrides ─────────────────
+   Every rule below applies only when the viewport is ≤ 768 px. Desktop
+   styling above is left completely untouched. The mobile flow is:
+     - compact topbar
+     - graphics pane (38dvh) ─ always visible
+     - plot pane     (22dvh) ─ always visible
+     - input panel   (rest)  ─ scrolls internally; Simulate is sticky-pinned
+       at the top of the panel so it is always visible regardless of how far
+       the user has scrolled through the section list.
+   Several features (graph upload, Manim zip, PNG export) are hidden via
+   :has() — the HTML is identical to desktop. */
+@media (max-width: 768px) {
+
+  /* Topbar: shorter, hide the subtitle. */
+  body { display: flex; flex-direction: column; }
+  .topbar { padding: 6px 12px; }
+  .topbar h1 { font-size: 13px; }
+  .topbar .subtitle { display: none; }
+
+  /* Layout: one column, three rows. Use dynamic viewport units (dvh) so
+     iOS Safari's collapsing URL bar doesn't push content off-screen. */
+  .layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: 38dvh 22dvh 1fr;
+    flex: 1;
+    height: auto;
+  }
+  .graphics { grid-row: 1; grid-column: 1; }
+  .plot     { grid-row: 2; grid-column: 1; }
+  .inputs   {
+    grid-row: 3; grid-column: 1;
+    padding: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Reorder children with flex `order` so Simulate appears at the top of
+     the scrollable panel, even though it sits after the sections in HTML. */
+  .panel-banner { display: none; }
+  #simulate {
+    order: 1;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    border-radius: 0;
+    margin: 0;
+    padding: 14px;
+    font-size: 16px;
+    touch-action: manipulation;
+  }
+  .sim-hint    { order: 2; padding: 4px 12px; margin: 0; background: var(--panel); }
+  details.group {
+    order: 3;
+    margin: 8px 8px 0;
+  }
+  details.group:last-of-type { margin-bottom: 8px; }
+
+  /* Mobile feature exclusions. */
+  .row:has(#upload)     { display: none; }
+  .row:has(#export-zip) { display: none; }
+  #export-plot          { display: none; }
+  /* CSV button stretches to fill the row once PNG is gone. */
+  .export-row { display: block; }
+
+  /* Graphics-pane header: tighter and smaller. */
+  .preview-badge { display: none; }
+  .pane-titles h2 { font-size: 12px; }
+  .pane-titles h3 { font-size: 10px; }
+  .pane-header { margin-bottom: 4px; }
+  .pane { padding: 8px; }
+
+  /* HUD: reposition for the smaller pane. */
+  .hud { top: 38px; left: 14px; font-size: 12px; gap: 6px; }
+
+  /* Player bar: bigger touch targets, scrubable track that's chunky enough
+     to tap reliably with a fingertip. */
+  .player-bar {
+    padding: 6px 8px;
+    gap: 6px;
+    bottom: 6px;
+    left: 6px;
+    right: 6px;
+  }
+  .player-bar button {
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
+  }
+  .player-speed-label { font-size: 10px; gap: 4px; }
+  .player-speed-label select { padding: 4px 6px; font-size: 12px; }
+  .player-time { font-size: 10px; min-width: 64px; }
+  .player-progress-track { height: 5px; }
+
+  /* Scrubable surfaces: disable default touch behaviour (pan/zoom) so our
+     pointermove handler can drive seek instead of the browser scrolling. */
+  .player-progress, .plot-area { touch-action: none; }
+
+  /* Input rows: comfortable fingertip target size. */
+  .row label { font-size: 12px; }
+  .row input, .row select { font-size: 14px; padding: 8px; }
+  .seed-pair button { padding: 8px 12px; font-size: 13px; }
+  .export-btn { padding: 10px; font-size: 14px; }
+}

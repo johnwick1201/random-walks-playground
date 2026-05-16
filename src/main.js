@@ -1,12 +1,12 @@
 // main.js — UI wiring (slice 1: graph spec → live render)
 
-import { buildGraph, layout, positions, adjacency, mkRng } from './graph.js?v=32';
-import { drawGraph } from './render.js?v=32';
-import { parseGraphML } from './graphml.js?v=32';
-import { simulate } from './sim.js?v=32';
-import { drawWalkerPlot, PLOT_PADDING } from './plot.js?v=32';
-import { Player } from './animate.js?v=32';
-import { exportPlotPNG, exportCsv, exportManimZip, exportGraphML } from './export.js?v=32';
+import { buildGraph, layout, positions, adjacency, mkRng } from './graph.js?v=33';
+import { drawGraph } from './render.js?v=33';
+import { parseGraphML } from './graphml.js?v=33';
+import { simulate } from './sim.js?v=33';
+import { drawWalkerPlot, PLOT_PADDING } from './plot.js?v=33';
+import { Player } from './animate.js?v=33';
+import { exportPlotPNG, exportCsv, exportManimZip, exportGraphML } from './export.js?v=33';
 
 console.log('[playground] main.js v3 loaded');
 
@@ -754,25 +754,50 @@ playerEnd.addEventListener('click', () => player?.jumpToEnd());
 playerSpeed.addEventListener('change', () => player?.setSpeed(parseFloat(playerSpeed.value)));
 
 // ── click-and-drag scrubbing ──
-// Two surfaces are scrubbable: the player progress bar, and the walker-count
-// plot itself (so the blue vertical marker behaves like a video-editor
-// timeline). They share one set of mousemove/mouseup listeners, with the
-// per-surface "where am I in time?" logic plugged in via `scrubComputeT`.
-let scrubbing = false;
-let scrubResumeAfter = false;
+// Two surfaces are scrubbable: the player progress bar and the walker-count
+// plot. The implementation uses Pointer Events (pointerdown/move/up) so the
+// same code path handles mouse, touch, and pen on every modern browser.
+//
+// `setPointerCapture` on pointerdown locks all subsequent events for that
+// pointer to the captured element — even when the finger or mouse leaves
+// the element's box. That replaces the old window-level listeners and
+// makes touch scrubbing work without bouncing the page.
 let lastScrubMs = 0;
-let scrubComputeT = null;
 
 function attachScrubbing(element, computeT) {
-  element.addEventListener('mousedown', (ev) => {
+  let scrubbing = false;
+  let resumeAfter = false;
+  let activePointerId = null;
+
+  element.addEventListener('pointerdown', (ev) => {
     if (!player) return;
     ev.preventDefault();
+    try { element.setPointerCapture(ev.pointerId); } catch (e) { /* ignore */ }
+    activePointerId = ev.pointerId;
     scrubbing = true;
-    scrubResumeAfter = player.playing;
-    scrubComputeT = computeT;
+    resumeAfter = player.playing;
     player.seekTo(computeT(ev.clientX));
     lastScrubMs = performance.now();
   });
+
+  element.addEventListener('pointermove', (ev) => {
+    if (!scrubbing || !player || ev.pointerId !== activePointerId) return;
+    // Throttle to ~60Hz so very large T values don't backlog seeks.
+    const now = performance.now();
+    if (now - lastScrubMs < 16) return;
+    lastScrubMs = now;
+    player.seekTo(computeT(ev.clientX));
+  });
+
+  const endScrub = (ev) => {
+    if (!scrubbing || ev.pointerId !== activePointerId) return;
+    try { element.releasePointerCapture(ev.pointerId); } catch (e) { /* ignore */ }
+    activePointerId = null;
+    scrubbing = false;
+    if (resumeAfter && player && player.t < player.T) player.play();
+  };
+  element.addEventListener('pointerup', endScrub);
+  element.addEventListener('pointercancel', endScrub);
 }
 
 // Progress-bar geometry: the whole bar maps linearly to [0, T].
@@ -792,21 +817,6 @@ attachScrubbing(plotArea, (clientX) => {
   const x = clientX - rect.left - PLOT_PADDING.L;
   const frac = Math.max(0, Math.min(1, x / innerW));
   return Math.round(frac * player.T);
-});
-
-window.addEventListener('mousemove', (ev) => {
-  if (!scrubbing || !player || !scrubComputeT) return;
-  // Throttle to ~60Hz so very large T values don't backlog seeks.
-  const now = performance.now();
-  if (now - lastScrubMs < 16) return;
-  lastScrubMs = now;
-  player.seekTo(scrubComputeT(ev.clientX));
-});
-
-window.addEventListener('mouseup', () => {
-  if (!scrubbing) return;
-  scrubbing = false;
-  if (scrubResumeAfter && player && player.t < player.T) player.play();
 });
 
 // ── export buttons ──
