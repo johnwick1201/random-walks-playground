@@ -477,10 +477,12 @@ details.group:not([open]) > summary::before { content: '▸'; }
          height and overflow-y: auto would have nothing to scroll. */
   .layout {
     grid-template-columns: 1fr;
-    /* Graphics gets a bit more vertical room than before so the grid nodes
-       don't look cramped top-to-bottom (horizontally there's already plenty).
-       Plot trimmed slightly to compensate; inputs scroll. */
-    grid-template-rows: 45dvh 20dvh minmax(0, 1fr);
+    /* Graphics and plot share the same vertical budget per the user's
+       request. The pair takes ~68dvh, leaving ~28dvh for the inputs panel
+       (which scrolls internally). Reducing graphics from 45dvh -> 34dvh
+       also brings the vertical inter-row spacing down to ~70 % of the
+       previous value. */
+    grid-template-rows: 34dvh 34dvh minmax(0, 1fr);
     flex: 1 1 0;
     min-height: 0;
     height: auto;

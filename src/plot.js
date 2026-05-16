@@ -16,18 +16,28 @@ const PLOT_COLORS = {
   text: '#e8e8ec',
 };
 
-// "Nice" tick step (1, 2, 5 × 10^k) for a target tick count.
+// "Nice" tick step (1, 2, 5 × 10^k) chosen so the produced tick count
+// stays close to (and usually below) `targetTicks`. Rule: pick the smallest
+// nice step >= the rough "even" spacing, which guarantees we don't undershoot
+// the target — important on mobile where we want fewer ticks, not just a
+// step closer to the rough value.
 function niceStep(range, targetTicks = 6) {
   if (range <= 0) return 1;
   const rough = range / targetTicks;
   const pow = Math.pow(10, Math.floor(Math.log10(rough)));
   const norm = rough / pow;
   let step;
-  if (norm < 1.5)      step = 1;
-  else if (norm < 3.5) step = 2;
-  else if (norm < 7.5) step = 5;
-  else                 step = 10;
+  if (norm <= 1)      step = 1;
+  else if (norm <= 2) step = 2;
+  else if (norm <= 5) step = 5;
+  else                step = 10;
   return step * pow;
+}
+
+function isMobileViewport() {
+  return typeof window !== 'undefined'
+    && window.matchMedia
+    && window.matchMedia('(max-width: 768px)').matches;
 }
 
 export function drawWalkerPlot(container, result, currentT = null) {
@@ -69,9 +79,13 @@ export function drawWalkerPlot(container, result, currentT = null) {
   // force the step to a positive integer — niceStep can return fractional
   // values (e.g. 0.5) when the range is small, which causes duplicate tick
   // labels like 0,1,1,2,2,3,3 once we round each printed value.
+  // On mobile the plot canvas is much smaller, so we aim for fewer ticks
+  // (target 3 on y, 4 on x) to prevent the labels from crowding into each
+  // other.
+  const mobile = isMobileViewport();
   ctx.strokeStyle = PLOT_COLORS.grid;
   ctx.lineWidth = 1;
-  const yStep = Math.max(1, Math.round(niceStep(yMax, 6)));
+  const yStep = Math.max(1, Math.round(niceStep(yMax, mobile ? 3 : 6)));
   for (let v = 0; v <= yMax; v += yStep) {
     const y = yToPx(v);
     ctx.beginPath();
@@ -79,7 +93,7 @@ export function drawWalkerPlot(container, result, currentT = null) {
     ctx.lineTo(padL + plotW, y);
     ctx.stroke();
   }
-  const xStep = Math.max(1, Math.round(niceStep(xMax, 6)));
+  const xStep = Math.max(1, Math.round(niceStep(xMax, mobile ? 4 : 6)));
   for (let v = 0; v <= xMax; v += xStep) {
     const x = xToPx(v);
     ctx.beginPath();
@@ -97,9 +111,9 @@ export function drawWalkerPlot(container, result, currentT = null) {
   ctx.lineTo(padL + plotW, padT + plotH);
   ctx.stroke();
 
-  // Tick labels
+  // Tick labels — slightly larger on mobile so they stay readable.
   ctx.fillStyle = PLOT_COLORS.tick;
-  ctx.font = '11px -apple-system, system-ui, sans-serif';
+  ctx.font = `${mobile ? 12 : 11}px -apple-system, system-ui, sans-serif`;
   ctx.textAlign = 'right';
   ctx.textBaseline = 'middle';
   for (let v = 0; v <= yMax; v += yStep) {
