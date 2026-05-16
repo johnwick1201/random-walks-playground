@@ -35,9 +35,10 @@ function niceStep(range, targetTicks = 6) {
 }
 
 function isMobileViewport() {
-  return typeof window !== 'undefined'
-    && window.matchMedia
-    && window.matchMedia('(max-width: 768px)').matches;
+  if (typeof window === 'undefined' || !window.matchMedia) return false;
+  // Mirror render.js — phones in either orientation get the compact look.
+  return window.matchMedia('(max-width: 768px)').matches
+      || window.matchMedia('(orientation: landscape) and (max-height: 500px)').matches;
 }
 
 export function drawWalkerPlot(container, result, currentT = null) {

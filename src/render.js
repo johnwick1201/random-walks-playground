@@ -38,9 +38,11 @@ const STUB_LEN_SCALE   = 2.8;        // doubled from before so wrap stubs read c
 // Stub length scale (exported so animate.js can reuse it for wrap-edge paths).
 export const STUB_LEN_SCALE_EXPORT = STUB_LEN_SCALE;
 function isMobileViewport() {
-  return typeof window !== 'undefined'
-    && window.matchMedia
-    && window.matchMedia('(max-width: 768px)').matches;
+  if (typeof window === 'undefined' || !window.matchMedia) return false;
+  // Match both portrait phones (narrow viewport) and landscape phones (short
+  // viewport). Desktops/tablets satisfy neither and keep the desktop look.
+  return window.matchMedia('(max-width: 768px)').matches
+      || window.matchMedia('(orientation: landscape) and (max-height: 500px)').matches;
 }
 export function computeNodeRadius(positions, N, mode = 'playback') {
   if (isMobileViewport()) {

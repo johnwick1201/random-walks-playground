@@ -438,18 +438,13 @@ details.group:not([open]) > summary::before { content: '▸'; }
   margin-top: 4px;
 }
 
-/* ───────────────── Mobile / small-screen overrides ─────────────────
-   Every rule below applies only when the viewport is ≤ 768 px. Desktop
-   styling above is left completely untouched. The mobile flow is:
-     - compact topbar
-     - graphics pane (38dvh) ─ always visible
-     - plot pane     (22dvh) ─ always visible
-     - input panel   (rest)  ─ scrolls internally; Simulate is sticky-pinned
-       at the top of the panel so it is always visible regardless of how far
-       the user has scrolled through the section list.
-   Several features (graph upload, Manim zip, PNG export) are hidden via
-   :has() — the HTML is identical to desktop. */
-@media (max-width: 768px) {
+/* ───────────────── Mobile (shared) ─────────────────
+   Compact-UI rules that apply on both portrait and landscape phones.
+   Triggered by EITHER a narrow viewport (portrait) OR a short viewport
+   (landscape phones — wider than 768 px but only ~390 px tall). Desktops
+   and tablets have > 500 px of height, so they never match the second
+   clause, and they're > 768 px wide so they don't match the first. */
+@media (max-width: 768px), (orientation: landscape) and (max-height: 500px) {
 
   /* Topbar: shorter, hide the long subtitle, show the website credits. */
   html, body { height: 100dvh; }
@@ -465,45 +460,26 @@ details.group:not([open]) > summary::before { content: '▸'; }
     color: var(--text-dim);
   }
 
-  /* Layout: one column, three rows. Use dynamic viewport units (dvh) so
-     iOS Safari's collapsing URL bar doesn't push content off-screen.
-     The crucial bits for the .inputs scroll to actually work:
-       - body is `display: flex; height: 100dvh`, .layout is `flex: 1 1 0`
-         with `min-height: 0`, so .layout strictly fills the remaining space.
-       - .layout uses `overflow: hidden` itself so it can never grow past
-         its assigned size.
-       - .inputs's row is `minmax(0, 1fr)` (not just `1fr`) — without the
-         min: 0 floor, the grid track would expand to its content's natural
-         height and overflow-y: auto would have nothing to scroll. */
-  .layout {
-    grid-template-columns: 1fr;
-    /* Restored to the 34dvh / 34dvh / 1fr layout the user preferred. The
-       player bar overlays the last row of nodes by a few pixels — known
-       trade-off, accepted because the graphic pane looks right at this
-       size. */
-    grid-template-rows: 34dvh 34dvh minmax(0, 1fr);
-    flex: 1 1 0;
-    min-height: 0;
-    height: auto;
-    overflow: hidden;
-  }
   .graphics, .plot, .inputs { min-height: 0; }
   .graphics, .plot { overflow: hidden; }
 
-  .graphics { grid-row: 1; grid-column: 1; }
-  .plot     { grid-row: 2; grid-column: 1; }
-  .inputs   {
-    grid-row: 3; grid-column: 1;
+  /* Mobile feature exclusions. */
+  .row:has(#upload)       { display: none; }
+  .row:has(#export-zip)   { display: none; }
+  .row:has(#export-graph) { display: none; }
+  #export-plot            { display: none; }
+  /* CSV button stretches to fill the row once PNG is gone. */
+  .export-row { display: block; }
+
+  /* Inputs: sticky Simulate, scrollable details, banner hidden. */
+  .panel-banner { display: none; }
+  .inputs {
     padding: 0;
     overflow-y: auto;
-    -webkit-overflow-scrolling: touch;  /* momentum scroll on older iOS */
+    -webkit-overflow-scrolling: touch;
     display: flex;
     flex-direction: column;
   }
-
-  /* Reorder children with flex `order` so Simulate appears at the top of
-     the scrollable panel, even though it sits after the sections in HTML. */
-  .panel-banner { display: none; }
   #simulate {
     order: 1;
     position: sticky;
@@ -515,20 +491,9 @@ details.group:not([open]) > summary::before { content: '▸'; }
     font-size: 16px;
     touch-action: manipulation;
   }
-  .sim-hint    { order: 2; padding: 4px 12px; margin: 0; background: var(--panel); }
-  details.group {
-    order: 3;
-    margin: 8px 8px 0;
-  }
+  .sim-hint     { order: 2; padding: 4px 12px; margin: 0; background: var(--panel); }
+  details.group { order: 3; margin: 8px 8px 0; }
   details.group:last-of-type { margin-bottom: 8px; }
-
-  /* Mobile feature exclusions. */
-  .row:has(#upload)       { display: none; }
-  .row:has(#export-zip)   { display: none; }
-  .row:has(#export-graph) { display: none; }
-  #export-plot            { display: none; }
-  /* CSV button stretches to fill the row once PNG is gone. */
-  .export-row { display: block; }
 
   /* Graphics-pane header: tighter and smaller. */
   .preview-badge { display: none; }
@@ -537,14 +502,9 @@ details.group:not([open]) > summary::before { content: '▸'; }
   .pane-header { margin-bottom: 4px; }
   .pane { padding: 8px; }
 
-  /* HUD: small enough for the compact pane, positioned cleanly below the
-     two-line header (h2 + h3 + 4px margin ≈ 46 px from pane top). */
-  .hud { top: 50px; left: 14px; font-size: 10px; gap: 5px; }
-
-  /* (No mobile #canvas override — desktop's calc(100% - 70px) is reused,
-     which lets the canvas fill the pane as the user wants. The player
-     bar overlays the bottom of the canvas; the last row of nodes sits
-     under it by a few pixels, accepted by the user.) */
+  /* HUD: small enough for the compact pane. Position is layout-specific
+     (overridden below in portrait/landscape blocks). */
+  .hud { font-size: 10px; gap: 5px; }
 
   /* Player bar: bigger touch targets, scrubable track that's chunky enough
      to tap reliably with a fingertip. */
@@ -574,4 +534,67 @@ details.group:not([open]) > summary::before { content: '▸'; }
   .row input, .row select { font-size: 14px; padding: 8px; }
   .seed-pair button { padding: 8px 12px; font-size: 13px; }
   .export-btn { padding: 10px; font-size: 14px; }
+}
+
+/* ───────────────── Phone portrait — vertical stack ─────────────────
+   The user's familiar layout: graphics on top, plot under it, input
+   panel scrolls in the remainder. */
+@media (max-width: 768px) {
+  .layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: 34dvh 34dvh minmax(0, 1fr);
+    flex: 1 1 0;
+    min-height: 0;
+    height: auto;
+    overflow: hidden;
+  }
+  .graphics { grid-row: 1; grid-column: 1; }
+  .plot     { grid-row: 2; grid-column: 1; }
+  .inputs   { grid-row: 3; grid-column: 1; }
+
+  /* HUD sits below the two-line pane header. */
+  .hud { top: 50px; left: 14px; }
+}
+
+/* ───────────────── Phone landscape — 3 columns side-by-side ─────────────────
+   Inputs left, graphics middle, plot right. Each pane gets the full
+   viewport height (minus the compact topbar). No vertical-stacking is
+   sensible here — the viewport is short and wide. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .layout {
+    grid-template-columns: minmax(200px, 26%) 1fr 1fr;
+    grid-template-rows: 1fr;
+    flex: 1 1 0;
+    min-height: 0;
+    height: auto;
+    overflow: hidden;
+  }
+  .inputs   { grid-row: 1; grid-column: 1; }
+  .graphics { grid-row: 1; grid-column: 2; }
+  .plot     { grid-row: 1; grid-column: 3; }
+
+  /* Topbar packs title and credits on one line so it stays a single thin
+     row (~26 px). With limited height every pixel saved here is a pixel
+     each pane gets. */
+  .topbar {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding: 4px 12px;
+  }
+  .topbar h1 {
+    flex: 1 1 auto; min-width: 0;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    font-size: 12px;
+  }
+  .mobile-credits { flex: 0 0 auto; margin: 0; font-size: 10px; }
+
+  /* Sticky Simulate is slightly more compact than portrait. */
+  #simulate { padding: 10px; font-size: 14px; }
+  .sim-hint     { padding: 3px 8px; font-size: 10px; }
+  details.group { margin: 6px 6px 0; }
+
+  /* HUD: graphics pane is now tall, so the HUD goes near the top
+     just under the small pane header. */
+  .hud { top: 44px; left: 10px; }
 }
