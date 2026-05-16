@@ -545,10 +545,13 @@ details.group:not([open]) > summary::before { content: '▸'; }
   /* The graphics pane carries an absolute-positioned player bar at its
      bottom. Desktop's default canvas height (calc(100% - 70px)) leaves the
      canvas extending under that bar, which on the small mobile pane meant
-     the last row of nodes sat right on top of the player buttons. Shrink
-     the canvas's CSS height so its bottom edge stops well above the
-     player bar. */
-  #canvas { height: calc(100% - 100px); }
+     the last row of nodes sat right on top of the player buttons.
+     Subtract just enough that the canvas's bottom edge lines up with the
+     player bar's top edge — no canvas extending under the buttons (so no
+     last-row collision), and no grey strip of bare pane between them. The
+     86 px = 48 px (player bar height) + 6 px (player bar bottom offset)
+     + ~32 px (header + 4 px margin). */
+  #canvas { height: calc(100% - 86px); }
 
   /* Player bar: bigger touch targets, scrubable track that's chunky enough
      to tap reliably with a fingertip. */
