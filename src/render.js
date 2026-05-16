@@ -37,13 +37,22 @@ const STUB_LEN_SCALE   = 2.8;        // doubled from before so wrap stubs read c
 
 // Stub length scale (exported so animate.js can reuse it for wrap-edge paths).
 export const STUB_LEN_SCALE_EXPORT = STUB_LEN_SCALE;
+function isMobileViewport() {
+  return typeof window !== 'undefined'
+    && window.matchMedia
+    && window.matchMedia('(max-width: 768px)').matches;
+}
 export function computeNodeRadius(positions, N, mode = 'playback') {
+  if (isMobileViewport()) {
+    return nodeRadius(positions, N, 0.18, 4, 11);
+  }
   const scale = (THEMES[mode] || THEMES.playback).radiusScale;
-  return nodeRadius(positions, N, scale);
+  return nodeRadius(positions, N, scale, 8, 28);
 }
 export function computeStubLen(positions, N, mode = 'playback') {
   const r = computeNodeRadius(positions, N, mode);
-  return Math.max(28, r * STUB_LEN_SCALE);
+  const minStub = isMobileViewport() ? 12 : 28;
+  return Math.max(minStub, r * STUB_LEN_SCALE);
 }
 
 // ── set up canvas with devicePixelRatio for crisp rendering ──
@@ -59,9 +68,11 @@ export function fitCanvas(canvas) {
 
 // ── compute a node radius that fits the spacing ──
 // Scale factor is theme-dependent: setup mode is larger to host numerals,
-// playback mode matches ManimGL's 0.18 factor.
-function nodeRadius(positions, N, scale) {
-  if (N <= 1) return 22;
+// playback mode matches ManimGL's 0.18 factor. minR/maxR clamp the result
+// so very dense / very sparse graphs still draw sensibly. Mobile passes
+// tighter bounds (e.g. 4..11) so dots stay small on a phone.
+function nodeRadius(positions, N, scale, minR = 8, maxR = 28) {
+  if (N <= 1) return maxR * 0.8;
   let minD = Infinity;
   for (let i = 0; i < N; i++) {
     for (let j = i + 1; j < N; j++) {
@@ -71,8 +82,8 @@ function nodeRadius(positions, N, scale) {
       if (d > 0 && d < minD) minD = d;
     }
   }
-  if (!isFinite(minD)) return 22;
-  return Math.max(8, Math.min(28, minD * scale));
+  if (!isFinite(minD)) return maxR * 0.8;
+  return Math.max(minR, Math.min(maxR, minD * scale));
 }
 
 // ── draw the static graph view (+ optional walker trails) ──
@@ -91,12 +102,28 @@ export function drawGraph(canvas, graph, state = {}) {
   }
   const advs = state.adversaries || new Set();
   const start = state.startNode ?? null;
-  const theme = THEMES[state.mode] || THEMES.setup;
+  const baseTheme = THEMES[state.mode] || THEMES.setup;
+  const mobile = isMobileViewport();
+
+  // Mobile collapses both modes to a simpler "colored dots" look: numbers
+  // and outlines off, all nodes the same (smaller) size, thinner edges.
+  // Adversary is still red and start is still green so the user can identify
+  // them at a glance — they just don't get the 1.6× radius boost desktop has.
+  const theme = !mobile ? baseTheme : {
+    ...baseTheme,
+    edge:        state.mode === 'playback' ? '#444444' : '#666666',
+    edgeWidth:   0.8,
+    node:        '#ffffff',
+    showText:    false,
+    stub:        state.mode === 'playback' ? '#444444' : '#666666',
+  };
 
   ctx.fillStyle = theme.bg;
   ctx.fillRect(0, 0, w, h);
 
-  const r = nodeRadius(positions, N, theme.radiusScale);
+  const r = mobile
+    ? nodeRadius(positions, N, 0.18, 4, 11)
+    : nodeRadius(positions, N, theme.radiusScale, 8, 28);
 
   // edges
   ctx.lineWidth = theme.edgeWidth;
@@ -113,9 +140,9 @@ export function drawGraph(canvas, graph, state = {}) {
     }
   }
 
-  // walker trails (playback mode only)
+  // walker trails (playback mode only) — thinner on mobile
   if (state.trails && state.trails.length) {
-    ctx.lineWidth = 3;
+    ctx.lineWidth = mobile ? 1.8 : 3;
     ctx.lineCap = 'round';
     for (const t of state.trails) {
       ctx.strokeStyle = t.color;
@@ -134,14 +161,19 @@ export function drawGraph(canvas, graph, state = {}) {
     const p = positions[i];
     const isAdv = advs.has(i);
     const isStart = i === start;
-    const highlight = isAdv || (isStart && state.mode !== 'playback');
+    // Mobile: flat radius for every node (no 1.6× highlight) so the layout
+    // stays compact. Desktop keeps the existing rule.
+    const highlight = !mobile && (isAdv || (isStart && state.mode !== 'playback'));
     const radius = highlight ? r * HIGHLIGHT_RADIUS_SCALE : r;
     const fontSize = Math.max(8, Math.round(radius * 0.85));
 
-    // Start-node green is a setup-mode affordance only. During playback the
-    // start node reverts to grey so the walker's color stands out instead.
-    if (isStart && state.mode !== 'playback') ctx.fillStyle = START_COL;
-    else if (isAdv) ctx.fillStyle = ADV_COL;
+    // Color rule:
+    //   adversary → red
+    //   start     → green (always on mobile; setup-only on desktop)
+    //   other     → theme.node (white on mobile, grey in desktop playback,
+    //                          white in desktop setup)
+    if (isAdv) ctx.fillStyle = ADV_COL;
+    else if (isStart && (mobile || state.mode !== 'playback')) ctx.fillStyle = START_COL;
     else ctx.fillStyle = theme.node;
 
     ctx.beginPath();

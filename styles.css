@@ -463,6 +463,11 @@ details.group:not([open]) > summary::before { content: '▸'; }
     flex: 1;
     height: auto;
   }
+  /* min-height: 0 lets each row honour its grid track size instead of
+     growing to fit content — without it, .inputs would expand to fit all
+     expanded sections and overflow-y: auto would have nothing to scroll. */
+  .graphics, .plot, .inputs { min-height: 0; }
+
   .graphics { grid-row: 1; grid-column: 1; }
   .plot     { grid-row: 2; grid-column: 1; }
   .inputs   {
@@ -495,9 +500,10 @@ details.group:not([open]) > summary::before { content: '▸'; }
   details.group:last-of-type { margin-bottom: 8px; }
 
   /* Mobile feature exclusions. */
-  .row:has(#upload)     { display: none; }
-  .row:has(#export-zip) { display: none; }
-  #export-plot          { display: none; }
+  .row:has(#upload)       { display: none; }
+  .row:has(#export-zip)   { display: none; }
+  .row:has(#export-graph) { display: none; }
+  #export-plot            { display: none; }
   /* CSV button stretches to fill the row once PNG is gone. */
   .export-row { display: block; }
 
