@@ -477,7 +477,10 @@ details.group:not([open]) > summary::before { content: '▸'; }
          height and overflow-y: auto would have nothing to scroll. */
   .layout {
     grid-template-columns: 1fr;
-    grid-template-rows: 38dvh 22dvh minmax(0, 1fr);
+    /* Graphics gets a bit more vertical room than before so the grid nodes
+       don't look cramped top-to-bottom (horizontally there's already plenty).
+       Plot trimmed slightly to compensate; inputs scroll. */
+    grid-template-rows: 45dvh 20dvh minmax(0, 1fr);
     flex: 1 1 0;
     min-height: 0;
     height: auto;
@@ -533,8 +536,9 @@ details.group:not([open]) > summary::before { content: '▸'; }
   .pane-header { margin-bottom: 4px; }
   .pane { padding: 8px; }
 
-  /* HUD: reposition for the smaller pane. */
-  .hud { top: 38px; left: 14px; font-size: 12px; gap: 6px; }
+  /* HUD: small enough for the compact pane, positioned cleanly below the
+     two-line header (h2 + h3 + 4px margin ≈ 46 px from pane top). */
+  .hud { top: 50px; left: 14px; font-size: 10px; gap: 5px; }
 
   /* Player bar: bigger touch targets, scrubable track that's chunky enough
      to tap reliably with a fingertip. */

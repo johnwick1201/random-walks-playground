@@ -27,8 +27,11 @@ export function layout(N) {
 }
 
 // ── canvas positions for layout ──
-// Returns positions in canvas pixel coords, centered with margin.
-export function positions(layout_, width, height, margin = 40) {
+// Returns positions in canvas pixel coords, centered with margin. On narrow
+// canvases (mobile) the margin shrinks so the grid spreads further across
+// the available height/width instead of cramming into the centre.
+export function positions(layout_, width, height, margin) {
+  if (margin === undefined) margin = width < 500 ? 20 : 40;
   const { N, cols, rows, grid } = layout_;
   const usableW = width - 2 * margin;
   const usableH = height - 2 * margin;
