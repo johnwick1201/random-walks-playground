@@ -477,12 +477,11 @@ details.group:not([open]) > summary::before { content: '▸'; }
          height and overflow-y: auto would have nothing to scroll. */
   .layout {
     grid-template-columns: 1fr;
-    /* Both graphics + plot panes share the same vertical budget. Trimmed
-       from 34dvh to 30dvh each (a ~12 % shrink — user asked 20 %, but the
-       canvas-height override below already drops the vertical inter-row
-       spacing past 20 %, and we want to keep dy reasonable). The pair takes
-       60 dvh; the inputs panel scrolls in the remaining ~36 dvh. */
-    grid-template-rows: 30dvh 30dvh minmax(0, 1fr);
+    /* Restored to the 34dvh / 34dvh / 1fr layout the user preferred. The
+       player bar overlays the last row of nodes by a few pixels — known
+       trade-off, accepted because the graphic pane looks right at this
+       size. */
+    grid-template-rows: 34dvh 34dvh minmax(0, 1fr);
     flex: 1 1 0;
     min-height: 0;
     height: auto;
@@ -542,16 +541,10 @@ details.group:not([open]) > summary::before { content: '▸'; }
      two-line header (h2 + h3 + 4px margin ≈ 46 px from pane top). */
   .hud { top: 50px; left: 14px; font-size: 10px; gap: 5px; }
 
-  /* The graphics pane carries an absolute-positioned player bar at its
-     bottom. Desktop's default canvas height (calc(100% - 70px)) leaves the
-     canvas extending under that bar, which on the small mobile pane meant
-     the last row of nodes sat right on top of the player buttons.
-     Subtract just enough that the canvas's bottom edge lines up with the
-     player bar's top edge — no canvas extending under the buttons (so no
-     last-row collision), and no grey strip of bare pane between them. The
-     86 px = 48 px (player bar height) + 6 px (player bar bottom offset)
-     + ~32 px (header + 4 px margin). */
-  #canvas { height: calc(100% - 86px); }
+  /* (No mobile #canvas override — desktop's calc(100% - 70px) is reused,
+     which lets the canvas fill the pane as the user wants. The player
+     bar overlays the bottom of the canvas; the last row of nodes sits
+     under it by a few pixels, accepted by the user.) */
 
   /* Player bar: bigger touch targets, scrubable track that's chunky enough
      to tap reliably with a fingertip. */
