@@ -450,23 +450,32 @@ details.group:not([open]) > summary::before { content: '▸'; }
 @media (max-width: 768px) {
 
   /* Topbar: shorter, hide the subtitle. */
+  html, body { height: 100dvh; }
   body { display: flex; flex-direction: column; }
-  .topbar { padding: 6px 12px; }
+  .topbar { padding: 6px 12px; flex: 0 0 auto; }
   .topbar h1 { font-size: 13px; }
   .topbar .subtitle { display: none; }
 
   /* Layout: one column, three rows. Use dynamic viewport units (dvh) so
-     iOS Safari's collapsing URL bar doesn't push content off-screen. */
+     iOS Safari's collapsing URL bar doesn't push content off-screen.
+     The crucial bits for the .inputs scroll to actually work:
+       - body is `display: flex; height: 100dvh`, .layout is `flex: 1 1 0`
+         with `min-height: 0`, so .layout strictly fills the remaining space.
+       - .layout uses `overflow: hidden` itself so it can never grow past
+         its assigned size.
+       - .inputs's row is `minmax(0, 1fr)` (not just `1fr`) — without the
+         min: 0 floor, the grid track would expand to its content's natural
+         height and overflow-y: auto would have nothing to scroll. */
   .layout {
     grid-template-columns: 1fr;
-    grid-template-rows: 38dvh 22dvh 1fr;
-    flex: 1;
+    grid-template-rows: 38dvh 22dvh minmax(0, 1fr);
+    flex: 1 1 0;
+    min-height: 0;
     height: auto;
+    overflow: hidden;
   }
-  /* min-height: 0 lets each row honour its grid track size instead of
-     growing to fit content — without it, .inputs would expand to fit all
-     expanded sections and overflow-y: auto would have nothing to scroll. */
   .graphics, .plot, .inputs { min-height: 0; }
+  .graphics, .plot { overflow: hidden; }
 
   .graphics { grid-row: 1; grid-column: 1; }
   .plot     { grid-row: 2; grid-column: 1; }
@@ -474,6 +483,7 @@ details.group:not([open]) > summary::before { content: '▸'; }
     grid-row: 3; grid-column: 1;
     padding: 0;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;  /* momentum scroll on older iOS */
     display: flex;
     flex-direction: column;
   }

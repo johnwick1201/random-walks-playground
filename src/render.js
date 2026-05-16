@@ -44,7 +44,8 @@ function isMobileViewport() {
 }
 export function computeNodeRadius(positions, N, mode = 'playback') {
   if (isMobileViewport()) {
-    return nodeRadius(positions, N, 0.18, 4, 11);
+    // Tightened ~30% from the previous mobile values (was 0.18 / [4, 11]).
+    return nodeRadius(positions, N, 0.13, 3, 8);
   }
   const scale = (THEMES[mode] || THEMES.playback).radiusScale;
   return nodeRadius(positions, N, scale, 8, 28);
@@ -122,7 +123,7 @@ export function drawGraph(canvas, graph, state = {}) {
   ctx.fillRect(0, 0, w, h);
 
   const r = mobile
-    ? nodeRadius(positions, N, 0.18, 4, 11)
+    ? nodeRadius(positions, N, 0.13, 3, 8)
     : nodeRadius(positions, N, theme.radiusScale, 8, 28);
 
   // edges
@@ -142,7 +143,7 @@ export function drawGraph(canvas, graph, state = {}) {
 
   // walker trails (playback mode only) — thinner on mobile
   if (state.trails && state.trails.length) {
-    ctx.lineWidth = mobile ? 1.8 : 3;
+    ctx.lineWidth = mobile ? 1.4 : 3;
     ctx.lineCap = 'round';
     for (const t of state.trails) {
       ctx.strokeStyle = t.color;
