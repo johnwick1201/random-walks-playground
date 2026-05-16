@@ -477,12 +477,12 @@ details.group:not([open]) > summary::before { content: '▸'; }
          height and overflow-y: auto would have nothing to scroll. */
   .layout {
     grid-template-columns: 1fr;
-    /* Graphics and plot share the same vertical budget per the user's
-       request. The pair takes ~68dvh, leaving ~28dvh for the inputs panel
-       (which scrolls internally). Reducing graphics from 45dvh -> 34dvh
-       also brings the vertical inter-row spacing down to ~70 % of the
-       previous value. */
-    grid-template-rows: 34dvh 34dvh minmax(0, 1fr);
+    /* Both graphics + plot panes share the same vertical budget. Trimmed
+       from 34dvh to 30dvh each (a ~12 % shrink — user asked 20 %, but the
+       canvas-height override below already drops the vertical inter-row
+       spacing past 20 %, and we want to keep dy reasonable). The pair takes
+       60 dvh; the inputs panel scrolls in the remaining ~36 dvh. */
+    grid-template-rows: 30dvh 30dvh minmax(0, 1fr);
     flex: 1 1 0;
     min-height: 0;
     height: auto;
@@ -541,6 +541,14 @@ details.group:not([open]) > summary::before { content: '▸'; }
   /* HUD: small enough for the compact pane, positioned cleanly below the
      two-line header (h2 + h3 + 4px margin ≈ 46 px from pane top). */
   .hud { top: 50px; left: 14px; font-size: 10px; gap: 5px; }
+
+  /* The graphics pane carries an absolute-positioned player bar at its
+     bottom. Desktop's default canvas height (calc(100% - 70px)) leaves the
+     canvas extending under that bar, which on the small mobile pane meant
+     the last row of nodes sat right on top of the player buttons. Shrink
+     the canvas's CSS height so its bottom edge stops well above the
+     player bar. */
+  #canvas { height: calc(100% - 100px); }
 
   /* Player bar: bigger touch targets, scrubable track that's chunky enough
      to tap reliably with a fingertip. */

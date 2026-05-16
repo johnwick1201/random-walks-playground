@@ -1,12 +1,12 @@
 // main.js — UI wiring (slice 1: graph spec → live render)
 
-import { buildGraph, layout, positions, adjacency, mkRng } from './graph.js?v=38';
-import { drawGraph } from './render.js?v=38';
-import { parseGraphML } from './graphml.js?v=38';
-import { simulate } from './sim.js?v=38';
-import { drawWalkerPlot, PLOT_PADDING } from './plot.js?v=38';
-import { Player } from './animate.js?v=38';
-import { exportPlotPNG, exportCsv, exportManimZip, exportGraphML } from './export.js?v=38';
+import { buildGraph, layout, positions, adjacency, mkRng } from './graph.js?v=39';
+import { drawGraph } from './render.js?v=39';
+import { parseGraphML } from './graphml.js?v=39';
+import { simulate } from './sim.js?v=39';
+import { drawWalkerPlot, PLOT_PADDING } from './plot.js?v=39';
+import { Player } from './animate.js?v=39';
+import { exportPlotPNG, exportCsv, exportManimZip, exportGraphML } from './export.js?v=39';
 
 console.log('[playground] main.js v3 loaded');
 
