@@ -594,7 +594,9 @@ details.group:not([open]) > summary::before { content: '▸'; }
   .sim-hint     { padding: 3px 8px; font-size: 10px; }
   details.group { margin: 6px 6px 0; }
 
-  /* HUD: graphics pane is now tall, so the HUD goes near the top
-     just under the small pane header. */
-  .hud { top: 44px; left: 10px; }
+  /* HUD: graphics pane is now tall, so the HUD goes near the top just
+     under the small pane header. 44 px was riding on top of the subtitle
+     line in landscape — bumped to 70 px so it clears even a wrapped
+     two-line subheading. */
+  .hud { top: 70px; left: 10px; }
 }
