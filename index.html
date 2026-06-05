@@ -6,7 +6,7 @@
   <meta http-equiv="Cache-Control" content="no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <title>Random Walks on Graphs — Playground</title>
-  <link rel="stylesheet" href="styles.css?v=47">
+  <link rel="stylesheet" href="styles.css?v=49">
 </head>
 <body>
   <header class="topbar">
@@ -19,7 +19,7 @@
     <!-- LEFT: input panel -->
     <section class="inputs" id="inputs">
       <div class="panel-banner">
-        <span><strong>Quick start:</strong> defaults are pre-filled — just click <em>Simulate</em>. Open any section below to tweak.</span>
+        <span><strong>Quick start:</strong> defaults are pre-filled — click <em>Randomize board</em> for a fresh setup, then <em>Simulate</em>.</span>
         <button type="button" id="collapse-all" class="collapse-toggle">Collapse all</button>
       </div>
 
@@ -27,13 +27,7 @@
         <summary>1. Graph</summary>
 
         <div class="row">
-          <label for="upload">Upload GraphML</label>
-          <input type="file" id="upload" accept=".graphml,.xml">
-          <small class="hint">Optional. Max 100 nodes.</small>
-        </div>
-
-        <div class="row">
-          <label for="N">Or specify N (nodes)</label>
+          <label for="N">Number of nodes (N)</label>
           <input type="number" id="N" min="2" max="100" step="1" value="100">
         </div>
 
@@ -54,47 +48,16 @@
             <input type="number" id="p" min="0" max="1" step="0.01" value="0.10">
           </div>
         </div>
-
-        <div class="row" id="row-seed" hidden>
-          <label for="seed">Random seed</label>
-          <div class="seed-pair">
-            <input type="number" id="seed" step="1" value="11">
-            <button type="button" id="regen-graph">Regenerate</button>
-          </div>
-          <small class="hint">Change the seed, or click Regenerate to draw a new sample.</small>
-        </div>
       </details>
 
       <details class="group" id="group-adversaries">
-        <summary>2. Adversarial nodes</summary>
+        <summary>2. Pac-Men (adversaries)</summary>
 
-        <div class="row">
-          <label for="adv-mode">Selection mode</label>
-          <select id="adv-mode">
-            <option value="list">Specify by list</option>
-            <option value="random">Random selection</option>
-          </select>
+        <div class="row" id="row-adv-count">
+          <label for="adv-count">Number of Pac-Men (M)</label>
+          <input type="number" id="adv-count" min="0" step="1" value="1">
+          <small class="hint" id="adv-count-note" hidden>Locations are set by the manual list in Advanced settings.</small>
         </div>
-
-        <div class="row" id="row-adv-list">
-          <label for="adv-list">Adversary node IDs (comma-separated, 1–N)</label>
-          <input type="text" id="adv-list" placeholder="e.g. 4, 8, 72, 83, 100" autocomplete="off">
-        </div>
-
-        <div class="row" id="row-adv-count" hidden>
-          <label for="adv-count">Number of adversaries (M)</label>
-          <input type="number" id="adv-count" min="0" step="1" value="10">
-        </div>
-
-        <div class="row" id="row-adv-seed" hidden>
-          <label for="adv-seed">Random seed</label>
-          <div class="seed-pair">
-            <input type="number" id="adv-seed" step="1" value="11">
-            <button type="button" id="regen-adv">Regenerate</button>
-          </div>
-        </div>
-
-        <div class="echo echo-adv" id="adv-echo"></div>
       </details>
 
       <details class="group" id="group-algorithm">
@@ -120,16 +83,46 @@
         </div>
       </details>
 
-      <details class="group" id="group-start">
-        <summary>4. Starting node</summary>
+      <details class="group" id="group-time">
+        <summary>4. Time steps</summary>
 
         <div class="row">
-          <label for="start-mode">Selection mode</label>
+          <label for="T">Number of time steps (T)</label>
+          <input type="number" id="T" min="1" max="10000" step="1" value="500">
+        </div>
+      </details>
+
+      <div class="echo-block">
+        <div class="echo echo-adv" id="adv-echo"></div>
+        <div class="echo echo-start" id="start-echo"></div>
+      </div>
+
+      <button type="button" id="randomize" class="export-btn randomize-btn">Randomize board</button>
+      <button type="button" id="simulate" class="simulate" disabled>Simulate</button>
+      <small class="hint sim-hint" id="sim-hint"></small>
+
+      <details class="group" id="group-advanced">
+        <summary>Advanced settings</summary>
+
+        <div class="row">
+          <label for="adv-mode">Pac-Man placement</label>
+          <select id="adv-mode">
+            <option value="random">Random (default)</option>
+            <option value="list">Specify by list</option>
+          </select>
+        </div>
+
+        <div class="row" id="row-adv-list" hidden>
+          <label for="adv-list">Pac-Man node IDs (comma-separated, 1–N)</label>
+          <input type="text" id="adv-list" placeholder="e.g. 4, 8, 72, 83, 100" autocomplete="off">
+        </div>
+
+        <div class="row">
+          <label for="start-mode">Starting node</label>
           <select id="start-mode">
-            <option value="">— select —</option>
-            <option value="manual">Specify by ID</option>
+            <option value="farthest">Auto — farthest from Pac-Men</option>
             <option value="random">Random</option>
-            <option value="farthest">Farthest from adversarial nodes</option>
+            <option value="manual">Specific node…</option>
           </select>
         </div>
 
@@ -138,31 +131,15 @@
           <input type="number" id="start-id" min="1" step="1" value="1">
         </div>
 
-        <div class="row" id="row-start-seed" hidden>
-          <label for="start-seed">Random seed</label>
-          <div class="seed-pair">
-            <input type="number" id="start-seed" step="1" value="11">
-            <button type="button" id="regen-start">Regenerate</button>
-          </div>
-        </div>
-
-        <div class="echo echo-start" id="start-echo"></div>
-      </details>
-
-      <details class="group" id="group-time">
-        <summary>5. Time steps</summary>
-
         <div class="row">
-          <label for="T">Number of time steps (T)</label>
-          <input type="number" id="T" min="1" max="10000" step="1" value="500">
+          <label for="upload">Upload GraphML</label>
+          <input type="file" id="upload" accept=".graphml,.xml">
+          <small class="hint">Optional. Max 100 nodes. Overrides topology &amp; N above.</small>
         </div>
       </details>
-
-      <button type="button" id="simulate" class="simulate" disabled>Simulate</button>
-      <small class="hint sim-hint" id="sim-hint"></small>
 
       <details class="group" id="group-exports">
-        <summary>6. Export</summary>
+        <summary>Export</summary>
 
         <div class="row">
           <small class="hint">Graph file (importable here or in NetworkX / Gephi / yEd):</small>
@@ -241,6 +218,6 @@
     </section>
   </main>
 
-  <script type="module" src="src/main.js?v=47"></script>
+  <script type="module" src="src/main.js?v=49"></script>
 </body>
 </html>

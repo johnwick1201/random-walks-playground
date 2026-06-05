@@ -23,7 +23,7 @@ algorithm selected.
 | Threshold A | {{A}} |
 | P_CREATE | {{P_CREATE}} |
 | Time steps T | {{T}} |
-| Default seed | {{SEED}} |
+| Graph seed (unused by replay) | {{SEED}} |
 
 All of these (and a few more knobs) are exposed as variables at the top of
 the render script — edit and re-run for a different sample.
@@ -96,27 +96,35 @@ Output lands in `videos/<script>/<resolution>/<SceneName>.mp4`.
 **4K renders can take 10× longer than HD** — use the default for tweaking
 parameters, switch to `--uhd` for the final cut.
 
-## 4. Tweaking parameters
+## 4. Tweaking the render
 
-Open either render script and edit the variables in the `# tunable parameters`
-block at the top:
+This script is a **replay, not a live simulation.** The exact run you saw in
+the browser is baked in as an event log (`EVENT_MOVES` / `EVENT_KILLED` /
+`EVENT_SPAWNED`), and the scenario (`N`, `EDGES`, `ADVERSARIES`, `START_NODE`)
+is hardcoded to match it. **To change the graph, the adversaries, the
+algorithm, or to draw a fresh random sample, re-export from the playground** —
+editing those variables here would desync them from the recorded events and
+the animation would break.
 
-```python
-SEED          = {{SEED}}        # new sample of walker steps each value
-T             = {{T}}           # total time steps to simulate
-A             = {{A}}           # threshold
-P_CREATE      = {{P_CREATE}}    # only used when ACTIVE_ALGORITHM == "cil"
-TRANSITION_DT = 0.25            # seconds per step in the rendered video
-```
-
-To switch from Duplicate-If-Late to Create-If-Late (or vice versa) without
-re-exporting from the website:
+What you *can* safely edit, at the top of the script:
 
 ```python
-ACTIVE_ALGORITHM = "dil"   # change to "cil"
+TRANSITION_DT = 0.25   # seconds per step in the video — the main pacing knob
 ```
 
-Both step functions are defined in the file; only the active one runs.
+| Variable | Effect of editing |
+|---|---|
+| `TRANSITION_DT` | Speeds up / slows down the whole animation. The real tunable. |
+| `WALKER_COLS`, `NODE_COL`, `ADV_COL`, … | Recolor the render. Purely cosmetic. |
+| `A` (and `P_CREATE` on Create-If-Late) | Only changes the text in the on-screen title; the walk itself is fixed by the event log. |
+| `PEAK_WALKERS` | Rescales the plot's y-axis. |
+| `T` | Lowering it renders fewer steps (truncates the replay). Raising it past the recorded length will error — re-export with a larger T instead. |
+
+`SEED` is carried for reference only; the replay does not use it.
+
+To switch between Duplicate-If-Late and Create-If-Late, re-export from the
+playground with the other algorithm selected — each algorithm ships its own
+script (`render_manimgl_dil.py` / `render_manimgl_cil.py`).
 
 ## 5. Troubleshooting
 
@@ -128,9 +136,9 @@ Both step functions are defined in the file; only the active one runs.
 | `pangocairo error` | Cairo/Pango missing (Linux/macOS) | `brew install cairo pango` or `apt install libcairo2-dev libpango1.0-dev` |
 | Video renders but is black | Display server issue (Linux headless) | Add `--write_all` / `-q` flag; ManimGL needs `xvfb-run` if no display |
 
-If something still doesn't work, the **simulation-only** script downloads
-(Python or MATLAB) don't need Manim at all and produce just the walker-count
-plot — useful as a sanity check that the scenario is set up right.
+If something still doesn't work, you can sanity-check the scenario without
+Manim at all: the playground's **Data (.csv)** and **Plot (.png)** exports give
+you the walker-count trajectory directly, no local render required.
 
 ## Files in this package
 

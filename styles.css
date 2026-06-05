@@ -222,6 +222,20 @@ details.group:not([open]) > summary::before { content: '▸'; }
   gap: 8px;
 }
 .export-row .export-btn { flex: 1; }
+
+/* Randomize: accent-outlined secondary button, sits just above Simulate. */
+.randomize-btn {
+  margin-top: 6px;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.randomize-btn:disabled {
+  border-color: var(--border);
+  color: var(--text-dim);
+}
+
+/* Echo block groups the "Pac-Men are…" / "Start is…" confirmations. */
+.echo-block:empty { display: none; }
 .hint {
   color: var(--text-dim);
   font-size: 11px;
@@ -480,6 +494,15 @@ details.group:not([open]) > summary::before { content: '▸'; }
     display: flex;
     flex-direction: column;
   }
+  /* Top action area: Randomize sits just above the sticky Simulate, then the
+     hint, the "Pac-Men / start" echoes, and finally the collapsed sections. */
+  #randomize {
+    order: 0;
+    margin: 0 8px 6px;
+    padding: 12px;
+    font-size: 15px;
+    touch-action: manipulation;
+  }
   #simulate {
     order: 1;
     position: sticky;
@@ -492,7 +515,8 @@ details.group:not([open]) > summary::before { content: '▸'; }
     touch-action: manipulation;
   }
   .sim-hint     { order: 2; padding: 4px 12px; margin: 0; background: var(--panel); }
-  details.group { order: 3; margin: 8px 8px 0; }
+  .echo-block   { order: 3; margin: 0 8px; }
+  details.group { order: 4; margin: 8px 8px 0; }
   details.group:last-of-type { margin-bottom: 8px; }
 
   /* Graphics-pane header: tighter and smaller. */

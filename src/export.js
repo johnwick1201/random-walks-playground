@@ -19,7 +19,7 @@ function substitute(template, vars) {
 
 async function fetchTemplate(name) {
   // Cache-bust to match the rest of the site's "force fresh" policy.
-  const r = await fetch(`templates/${name}?v=28`);
+  const r = await fetch(`templates/${name}?v=29`);
   if (!r.ok) throw new Error(`Failed to load template ${name}: HTTP ${r.status}`);
   return await r.text();
 }

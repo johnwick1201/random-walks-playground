@@ -17,13 +17,14 @@ const state = {
   topology: 'grid',
   p: 0.10,
   seed: 11,
+  masterSeed: 11,          // single hidden seed; Randomize rolls a new one
   graph: null,
   uploaded: false,
   // adversaries — default to random selection so the user lands on a fully
   // configured scenario they can just click Simulate on.
   advMode: 'random',       // 'list' | 'random'
   advListRaw: '',          // raw text in the CSV input
-  advCount: 10,            // M (used in random mode)
+  advCount: 1,             // M (used in random mode)
   advSeed: 123456789,
   adversaries: new Set(),  // 0-indexed Set<number>
   // algorithm
@@ -53,9 +54,6 @@ const topologyHint = el('topology-hint');
 const rowP = el('row-p');
 const pSlider = el('p-slider');
 const pInput = el('p');
-const rowSeed = el('row-seed');
-const seedInput = el('seed');
-const regenBtn = el('regen-graph');
 const upload = el('upload');
 
 // adversary controls
@@ -64,9 +62,7 @@ const rowAdvList = el('row-adv-list');
 const advList = el('adv-list');
 const rowAdvCount = el('row-adv-count');
 const advCount = el('adv-count');
-const rowAdvSeed = el('row-adv-seed');
-const advSeed = el('adv-seed');
-const regenAdvBtn = el('regen-adv');
+const advCountNote = el('adv-count-note');
 const advEcho = el('adv-echo');
 
 // algorithm controls
@@ -81,13 +77,11 @@ const pcreateInput = el('pcreate');
 const startMode = el('start-mode');
 const rowStartId = el('row-start-id');
 const startId = el('start-id');
-const rowStartSeed = el('row-start-seed');
-const startSeedInput = el('start-seed');
-const regenStartBtn = el('regen-start');
 const startEcho = el('start-echo');
 
 // time / simulate
 const TInput = el('T');
+const randomizeBtn = el('randomize');
 const simulateBtn = el('simulate');
 const simHint = el('sim-hint');
 const plotArea = el('plot-area');
@@ -242,7 +236,6 @@ const TOPOLOGY_HINTS = {
 // ── show/hide rows based on topology ──
 function updateTopologyVisibility() {
   rowP.hidden = topology.value !== 'er';
-  rowSeed.hidden = topology.value !== 'er';
   refreshTopologyHint();
 }
 
@@ -288,13 +281,10 @@ function render() {
 // Stop disallowed characters at the keystroke layer so the validator only
 // has to worry about range / empty, not malformed numbers.
 blockChars(N_input, '.,eE-+');   // N: positive integer only
-blockChars(seedInput, '.,eE');   // seed: any integer (negative OK)
 blockChars(advCount, '.eE-+');   // M: non-negative integer
-blockChars(advSeed,  '.,eE');    // adversary seed: any integer
 blockChars(thresholdInput, '.,eE-+');  // threshold: strictly positive integer
 blockChars(pcreateInput, 'eE,-+');     // pcreate: real in [0,1] — decimals OK
 blockChars(startId, '.,eE-+');         // start ID: positive integer
-blockChars(startSeedInput, '.,eE');    // start seed: any integer
 blockChars(TInput, '.,eE-+');          // T: strictly positive integer
 // CSV input: digits, commas, spaces. Letters and decimals blocked.
 advList.addEventListener('beforeinput', (e) => {
@@ -368,39 +358,15 @@ pInput.addEventListener('input', () => {
   }
 });
 
-seedInput.addEventListener('input', () => {
-  const r = validateInteger(seedInput.value, { name: 'Random seed' });
-  if (r.ok === true) {
-    clearError('Random seed');
-    state.seed = r.value;
-    if (state.topology === 'er') {
-      state.uploaded = false;
-      upload.value = '';
-      render();
-      recomputeStart();
-    }
-  } else if (r.ok === 'empty') {
-    clearError('Random seed');
-  } else {
-    showError('Random seed', r.error);
-  }
-});
-
-regenBtn.addEventListener('click', () => {
-  state.seed = Math.floor(Math.random() * 1e9);
-  seedInput.value = String(state.seed);
-  state.uploaded = false;
-  upload.value = '';
-  render();
-  recomputeStart();
-});
+// (Graph seed input + per-section "Regenerate" removed. Randomness is driven
+//  by a single hidden master seed — see deriveSeeds() / randomizeLayout().)
 
 // ── adversary wiring ──
 function updateAdvVisibility() {
   const isList = advMode.value === 'list';
-  rowAdvList.hidden = !isList;
-  rowAdvCount.hidden = isList;
-  rowAdvSeed.hidden = isList;
+  rowAdvList.hidden = !isList;     // manual ID list lives in Advanced settings
+  advCount.disabled = isList;      // a manual list overrides the Main count
+  advCountNote.hidden = !isList;
 }
 
 function renderAdvEcho() {
@@ -476,24 +442,7 @@ advCount.addEventListener('input', () => {
   }
 });
 
-advSeed.addEventListener('input', () => {
-  const r = validateInteger(advSeed.value, { name: 'Adversary seed' });
-  if (r.ok === true) {
-    clearError('Adversary seed');
-    state.advSeed = r.value;
-    recomputeAdversaries();
-  } else if (r.ok === 'empty') {
-    clearError('Adversary seed');
-  } else {
-    showError('Adversary seed', r.error);
-  }
-});
-
-regenAdvBtn.addEventListener('click', () => {
-  state.advSeed = Math.floor(Math.random() * 1e9);
-  advSeed.value = String(state.advSeed);
-  recomputeAdversaries();
-});
+// (Adversary seed input + "Regenerate" removed — see randomizeLayout().)
 
 // ── warning system (non-blocking; coexists with error overlay) ──
 const activeWarnings = new Map();
@@ -557,7 +506,6 @@ function randomStartNode(N, advs, seed) {
 function updateStartVisibility() {
   const m = startMode.value;
   rowStartId.hidden = m !== 'manual';
-  rowStartSeed.hidden = m !== 'random';
 }
 
 function renderStartEcho() {
@@ -665,6 +613,43 @@ function refreshSimulateButton() {
   simulateBtn.disabled = reason !== '';
   simHint.textContent = reason ? `Waiting on: ${reason}` : '';
   refreshExportButtons();
+  refreshRandomizeButton();
+}
+
+// ── single hidden master seed → per-subsystem sub-seeds ──
+// The user never sees a seed. Each random-mode subsystem (ER edges / Pac-Men /
+// start) derives its own seed from the master. Fixed subsystems ignore these
+// values, so they stay put across a Randomize.
+function deriveSeeds() {
+  state.seed      = state.masterSeed;
+  state.advSeed   = (state.masterSeed + 101) >>> 0;
+  state.startSeed = (state.masterSeed + 202) >>> 0;
+}
+
+// Randomize is meaningful only if SOMETHING is currently random: an Erdős–Rényi
+// graph (grid/toroidal are deterministic), random Pac-Men, or a random start.
+// When everything is fixed we grey the button out so it never lies.
+function refreshRandomizeButton() {
+  if (!randomizeBtn) return;
+  const graphRandom = state.topology === 'er' && !state.uploaded;
+  const advRandom   = advMode.value === 'random';
+  const startRandom = startMode.value === 'random';
+  const any = graphRandom || advRandom || startRandom;
+  randomizeBtn.disabled = !any;
+  randomizeBtn.title = any
+    ? 'Re-roll the random parts of the board (Pac-Men, start node, and Erdős–Rényi edges).'
+    : 'Nothing is set to random. Switch a setting to random in Advanced settings to enable.';
+}
+
+// Roll a fresh board: new master seed, re-render, recompute placements. Only
+// random-mode subsystems actually change — the recompute functions and the
+// deterministic generators leave fixed values alone. The walk itself is NOT
+// run here; the user still clicks Simulate for that.
+function randomizeLayout() {
+  state.masterSeed = Math.floor(Math.random() * 1e9);
+  deriveSeeds();
+  if (!state.uploaded) render();   // ER resamples; grid/toroidal redraw identically
+  recomputeAdversaries();          // re-rolls if random; cascades to start + warnings + preview
 }
 
 TInput.addEventListener('input', () => {
@@ -704,6 +689,9 @@ simulateBtn.addEventListener('click', () => {
   startPlayback();
   refreshExportButtons();   // enable Plot/CSV now that simResult exists
 });
+
+// Randomize re-rolls the board + preview only — it never runs the walk.
+randomizeBtn.addEventListener('click', randomizeLayout);
 
 // ── playback wiring ──
 function startPlayback() {
@@ -890,23 +878,7 @@ startMode.addEventListener('change', () => {
   recomputeStart();
 });
 startId.addEventListener('input', () => recomputeStart());
-startSeedInput.addEventListener('input', () => {
-  const r = validateInteger(startSeedInput.value, { name: 'Start seed' });
-  if (r.ok === true) {
-    clearError('Start seed');
-    state.startSeed = r.value;
-    if (startMode.value === 'random') recomputeStart();
-  } else if (r.ok === 'empty') {
-    clearError('Start seed');
-  } else {
-    showError('Start seed', r.error);
-  }
-});
-regenStartBtn.addEventListener('click', () => {
-  state.startSeed = Math.floor(Math.random() * 1e9);
-  startSeedInput.value = String(state.startSeed);
-  recomputeStart();
-});
+// (Start seed input + "Regenerate" removed — see randomizeLayout().)
 
 // ── algorithm wiring + pane title/subtitle ──
 const ALGO_TITLES = {
@@ -1020,19 +992,18 @@ window.addEventListener('resize', () => {
 // immediately — Quick Start without a button.
 N_input.value        = String(state.N);
 topology.value       = state.topology;
-seedInput.value      = String(state.seed);
 pSlider.value        = String(state.p);
 pInput.value         = String(state.p);
 advMode.value        = state.advMode;
 advCount.value       = String(state.advCount);
-advSeed.value        = String(state.advSeed);
 algorithmSel.value   = state.algorithm;
 thresholdInput.value = String(state.threshold);
 pcreateInput.value   = String(state.pcreate);
 startMode.value      = state.startMode;
 startId.value        = String(state.startIdRaw);
-startSeedInput.value = String(state.startSeed);
 TInput.value         = String(state.T);
+
+deriveSeeds();           // populate seed/advSeed/startSeed from the master seed
 
 updateTopologyVisibility();
 updateAdvVisibility();
@@ -1040,7 +1011,7 @@ updateAlgoVisibility();
 updateStartVisibility();
 syncPaneTitle();
 render();                 // builds state.graph
-recomputeAdversaries();   // generates 10 random adversaries + re-runs start/warnings
+recomputeAdversaries();   // generates the random Pac-Men + re-runs start/warnings
 refreshSimulateButton();
 refreshExportButtons();
 
