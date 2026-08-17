@@ -297,15 +297,60 @@ details.group:not([open]) > summary::before { content: '▸'; }
   border-radius: 4px;
 }
 
-/* ── plot pane ── */
+/* ── plot pane ──
+   Flex column so the plot area takes whatever height the header leaves over,
+   instead of subtracting a hand-tuned pixel value that breaks the moment the
+   header gains a control or changes font size on mobile. */
+.plot {
+  display: flex;
+  flex-direction: column;
+}
+.plot-header {
+  flex: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
 .plot h2 {
-  margin: 0 0 8px;
+  margin: 0;
   font-size: 14px;
   font-weight: 600;
 }
+
+/* Segmented "Progressive / Whole graph" toggle. */
+.plot-mode {
+  flex: none;
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.plot-mode-btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 11px;
+  padding: 4px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.plot-mode-btn + .plot-mode-btn { border-left: 1px solid var(--border); }
+.plot-mode-btn:hover { color: var(--text); background: rgba(255, 255, 255, 0.05); }
+.plot-mode-btn.is-active {
+  background: rgba(102, 194, 255, 0.15);
+  color: var(--accent);
+  font-weight: 600;
+}
+.plot-mode-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
 .plot-area {
   width: 100%;
-  height: calc(100% - 28px);
+  flex: 1 1 auto;
+  min-height: 0;
   background: #000;
   border-radius: 4px;
   display: flex;
@@ -525,6 +570,15 @@ details.group:not([open]) > summary::before { content: '▸'; }
   .pane-titles h3 { font-size: 10px; }
   .pane-header { margin-bottom: 4px; }
   .pane { padding: 8px; }
+
+  /* Plot-pane header: compact, but the mode toggle stays tappable. */
+  .plot-header { margin-bottom: 4px; gap: 8px; }
+  .plot h2 { font-size: 12px; }
+  .plot-mode-btn {
+    font-size: 10px;
+    padding: 4px 8px;
+    touch-action: manipulation;
+  }
 
   /* HUD: small enough for the compact pane. Position is layout-specific
      (overridden below in portrait/landscape blocks). */

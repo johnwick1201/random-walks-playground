@@ -4,7 +4,7 @@ import { buildGraph, layout, positions, adjacency, mkRng } from './graph.js?v=47
 import { drawGraph } from './render.js?v=47';
 import { parseGraphML } from './graphml.js?v=47';
 import { simulate } from './sim.js?v=47';
-import { drawWalkerPlot, PLOT_PADDING } from './plot.js?v=47';
+import { drawWalkerPlot, PLOT_PADDING } from './plot.js?v=48';
 import { Player } from './animate.js?v=47';
 import { exportPlotPNG, exportCsv, exportManimZip, exportGraphML } from './export.js?v=47';
 
@@ -38,6 +38,8 @@ const state = {
   startNode: null,         // 0-indexed (or null if not set)
   // time
   T: 500,                  // positive integer
+  // plot
+  plotMode: 'progressive', // 'progressive' | 'whole'
   // simulation result
   simResult: null,         // last simulate() output, or null
 };
@@ -85,6 +87,11 @@ const randomizeBtn = el('randomize');
 const simulateBtn = el('simulate');
 const simHint = el('sim-hint');
 const plotArea = el('plot-area');
+
+// plot-mode toggle (lives in the plot pane, outside .inputs, so switching it
+// never counts as a scenario change and never invalidates the current run)
+const plotModeProgressive = el('plot-mode-progressive');
+const plotModeWhole = el('plot-mode-whole');
 
 // player controls
 const playerBar = el('player-bar');
@@ -667,6 +674,34 @@ TInput.addEventListener('input', () => {
   refreshSimulateButton();
 });
 
+// ── plot drawing + mode toggle ──
+// The one place that knows how the plot is drawn, so the Simulate handler, the
+// player tick, the scrubber and the mode toggle can't drift apart. `t` is the
+// playhead position; null means "no playhead marker".
+function redrawPlot(t) {
+  if (!state.simResult) return;
+  drawWalkerPlot(plotArea, state.simResult, t, {
+    progressive: state.plotMode === 'progressive',
+  });
+  lastDrawnPlotT = t;
+}
+
+function setPlotMode(mode) {
+  if (mode === state.plotMode) return;
+  state.plotMode = mode;
+  const isProgressive = mode === 'progressive';
+  plotModeProgressive.classList.toggle('is-active', isProgressive);
+  plotModeWhole.classList.toggle('is-active', !isProgressive);
+  plotModeProgressive.setAttribute('aria-pressed', String(isProgressive));
+  plotModeWhole.setAttribute('aria-pressed', String(!isProgressive));
+  // Repaint at the current playhead so the switch shows up immediately even
+  // while paused: progressive clips back to t, whole-graph reveals the rest.
+  redrawPlot(player ? player.t : (isProgressive ? 0 : null));
+}
+
+plotModeProgressive.addEventListener('click', () => setPlotMode('progressive'));
+plotModeWhole.addEventListener('click', () => setPlotMode('whole'));
+
 // Every Simulate run uses a fresh random seed so consecutive clicks produce
 // independent samples (matches the user's request that re-clicking re-rolls).
 simulateBtn.addEventListener('click', () => {
@@ -685,7 +720,9 @@ simulateBtn.addEventListener('click', () => {
   });
   const dt = (performance.now() - t0).toFixed(1);
   console.log(`[simulate] ${state.algorithm.toUpperCase()} ran in ${dt}ms, peak=${state.simResult.peak}, extinct=${state.simResult.extinctAt}`);
-  drawWalkerPlot(plotArea, state.simResult);
+  // Progressive starts clipped at t=0 (an empty frame + the t=0 dot); whole
+  // graph paints the finished curve with no playhead yet, as it always has.
+  redrawPlot(state.plotMode === 'progressive' ? 0 : null);
   startPlayback();
   refreshExportButtons();   // enable Plot/CSV now that simResult exists
 });
@@ -722,11 +759,11 @@ function startPlayback() {
       const wc = state.simResult.walkerCount[t] ?? 0;
       hudT.textContent = t;
       hudWalkers.textContent = wc;
-      // Plot marker: redraw only when t advances to an integer step.
-      if (t !== lastDrawnPlotT) {
-        drawWalkerPlot(plotArea, state.simResult, t);
-        lastDrawnPlotT = t;
-      }
+      // Redraw only when t advances to a new integer step. This is also the
+      // path every scrub takes (seekTo → _drawFrame → onTick), so dragging the
+      // slider anywhere — including straight to the end — repaints the plot at
+      // that t in whichever mode is active.
+      if (t !== lastDrawnPlotT) redrawPlot(t);
     },
   });
   player.setSpeed(parseFloat(playerSpeed.value));

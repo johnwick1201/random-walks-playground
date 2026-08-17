@@ -41,7 +41,14 @@ function isMobileViewport() {
       || window.matchMedia('(orientation: landscape) and (max-height: 500px)').matches;
 }
 
-export function drawWalkerPlot(container, result, currentT = null) {
+// `currentT` positions the playhead marker (null = no marker).
+// `opts.progressive` draws the curve only up to `currentT` instead of all at
+// once, so the plot reveals itself in step with the animation. It follows the
+// scrubber in both directions — seeking to t redraws the curve clipped to t —
+// because every seek routes through the same onTick → drawWalkerPlot path.
+// Progressive needs a `currentT` to clip against; without one it falls back to
+// the whole curve (that's the path the PNG export takes).
+export function drawWalkerPlot(container, result, currentT = null, opts = {}) {
   container.innerHTML = '';
   const canvas = document.createElement('canvas');
   canvas.style.width = '100%';
@@ -141,15 +148,30 @@ export function drawWalkerPlot(container, result, currentT = null) {
   ctx.fillText('# walkers', 0, 0);
   ctx.restore();
 
-  // Walker-count line
+  // Walker-count line. The axes are always scaled to the full run (xMax = T,
+  // yMax = peak) so the frame stays still while a progressive curve grows into
+  // it — a rescaling axis makes the line jump around and is far harder to read.
+  const lastT = walkerCount.length - 1;
+  const progressive = opts.progressive === true && currentT != null;
+  const endT = progressive ? Math.max(0, Math.min(Math.floor(currentT), lastT)) : lastT;
+
   ctx.strokeStyle = PLOT_COLORS.line;
   ctx.lineWidth = 1.8;
-  ctx.beginPath();
-  ctx.moveTo(xToPx(0), yToPx(walkerCount[0]));
-  for (let t = 1; t < walkerCount.length; t++) {
-    ctx.lineTo(xToPx(t), yToPx(walkerCount[t]));
+  if (endT === 0) {
+    // A single point strokes nothing, so mark t=0 with a dot instead — keeps
+    // the plot from looking broken/empty before playback advances.
+    ctx.fillStyle = PLOT_COLORS.line;
+    ctx.beginPath();
+    ctx.arc(xToPx(0), yToPx(walkerCount[0]), 2, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    ctx.beginPath();
+    ctx.moveTo(xToPx(0), yToPx(walkerCount[0]));
+    for (let t = 1; t <= endT; t++) {
+      ctx.lineTo(xToPx(t), yToPx(walkerCount[t]));
+    }
+    ctx.stroke();
   }
-  ctx.stroke();
 
   // Current-t marker (driven by the player; thin vertical line)
   if (currentT != null && currentT >= 0 && currentT <= xMax) {
@@ -171,8 +193,9 @@ export function drawWalkerPlot(container, result, currentT = null) {
     ctx.restore();
   }
 
-  // Extinction marker
-  if (extinctAt != null) {
+  // Extinction marker — withheld in progressive mode until playback actually
+  // reaches it, otherwise the label spoils the ending the mode exists to hide.
+  if (extinctAt != null && (!progressive || endT >= extinctAt)) {
     ctx.strokeStyle = PLOT_COLORS.extinct;
     ctx.setLineDash([4, 3]);
     ctx.lineWidth = 1.2;

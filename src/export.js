@@ -4,7 +4,7 @@
 
 import { serializeGraphML } from './graphml.js';
 import { createZip } from './zip.js';
-import { drawWalkerPlot } from './plot.js';
+import { drawWalkerPlot } from './plot.js?v=48';
 
 // ── helpers ──
 function substitute(template, vars) {
